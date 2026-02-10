@@ -859,10 +859,15 @@ class AccDocsWindow(object):
 
         try:
             creds = _get_env_credentials()
+            loaded_any = False
             if creds.get(ENV_CLIENT_ID_KEY):
                 self.client_id_box.Text = creds.get(ENV_CLIENT_ID_KEY)
+                loaded_any = True
             if creds.get(ENV_CLIENT_SECRET_KEY):
                 self.client_secret_box.Password = creds.get(ENV_CLIENT_SECRET_KEY)
+                loaded_any = True
+            if loaded_any:
+                self.log("Credentials loaded from environment/.env.")
         except Exception:
             pass
 
@@ -1056,7 +1061,7 @@ class AccDocsWindow(object):
 
         if not client_id or not client_secret:
             MessageBox.Show(
-                "Client ID and Client Secret are required. Set them in .env as CLIENT_ID and CLIENT_SECRET.",
+                "Client ID and Client Secret are required. Enter them here or provide a .env with CLIENT_ID and CLIENT_SECRET.",
                 TITLE,
                 MessageBoxButton.OK,
                 MessageBoxImage.Warning,

@@ -74,11 +74,14 @@
 
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
-                        <TextBlock x:Name="ClientIdLabel" Text="Client ID" FontWeight="SemiBold" Visibility="Collapsed" />
-                        <TextBox x:Name="ClientIdBox" Visibility="Collapsed" />
+                        <TextBlock x:Name="ClientIdLabel" Text="Client ID" FontWeight="SemiBold" />
+                        <TextBox x:Name="ClientIdBox" />
 
-                        <TextBlock x:Name="ClientSecretLabel" Text="Client Secret" FontWeight="SemiBold" Visibility="Collapsed" />
-                        <PasswordBox x:Name="ClientSecretBox" Visibility="Collapsed" />
+                        <TextBlock x:Name="ClientSecretLabel" Text="Client Secret" FontWeight="SemiBold" />
+                        <PasswordBox x:Name="ClientSecretBox" />
+
+                        <TextBlock Text="Tip: If a .env is present, these fields are auto-filled."
+                                   Foreground="#6B6B6B" FontSize="11" Margin="0,-2,0,8" />
 
                         <TextBlock x:Name="RedirectUriLabel" Text="Redirect URI" FontWeight="SemiBold" Visibility="Collapsed" />
                         <TextBox x:Name="RedirectUriBox" IsReadOnly="True" Visibility="Collapsed" />
