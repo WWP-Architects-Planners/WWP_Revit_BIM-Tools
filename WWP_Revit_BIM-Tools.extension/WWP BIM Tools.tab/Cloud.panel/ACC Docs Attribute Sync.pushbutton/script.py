@@ -15,6 +15,7 @@ from System.Diagnostics import Process, ProcessStartInfo
 from System.Threading import Thread, ThreadStart
 from System.Windows import MessageBox, MessageBoxButton, MessageBoxImage
 from System.Windows.Controls import TreeViewItem
+from System.Windows.Input import MouseButtonEventHandler
 from System.Windows import RoutedEventHandler
 from System.Collections.ObjectModel import ObservableCollection
 from System.Windows.Markup import XamlReader
@@ -641,17 +642,78 @@ class AccDataClient(object):
             "data": {
                 "type": "items",
                 "id": item_id,
-                "attributes": {"description": description},
+                "attributes": {
+                    "extension": {
+                        "data": {
+                            "description": description,
+                        }
+                    }
+                },
             },
         })
 
         headers = {"Authorization": "Bearer " + self._session.AccessToken}
+        try:
+            desc_preview = description if description is not None else ""
+            if len(desc_preview) > 120:
+                desc_preview = desc_preview[:117] + "..."
+            self._log("PATCH item description: item_id={0} desc_len={1} desc='{2}'".format(
+                item_id,
+                len(description or ""),
+                desc_preview,
+            ))
+            self._log("PATCH url: {0}".format(url))
+            self._log("PATCH body: {0}".format(body))
+        except Exception:
+            pass
+        http_send("PATCH", url, body, "application/vnd.api+json", headers)
+
+    def update_version_description(self, project_id, version_id, description):
+        self._ensure_token()
+        url = "https://developer.api.autodesk.com/data/v1/projects/{0}/versions/{1}".format(
+            Uri.EscapeDataString(project_id),
+            Uri.EscapeDataString(version_id),
+        )
+
+        body = json.dumps({
+            "jsonapi": {"version": "1.0"},
+            "data": {
+                "type": "versions",
+                "id": version_id,
+                "attributes": {
+                    "description": description,
+                },
+            },
+        })
+
+        headers = {"Authorization": "Bearer " + self._session.AccessToken}
+        try:
+            desc_preview = description if description is not None else ""
+            if len(desc_preview) > 120:
+                desc_preview = desc_preview[:117] + "..."
+            self._log("PATCH version description: version_id={0} desc_len={1} desc='{2}'".format(
+                version_id,
+                len(description or ""),
+                desc_preview,
+            ))
+            self._log("PATCH url: {0}".format(url))
+            self._log("PATCH body: {0}".format(body))
+        except Exception:
+            pass
         http_send("PATCH", url, body, "application/vnd.api+json", headers)
 
     def _get(self, url):
         self._ensure_token()
         headers = {"Authorization": "Bearer " + self._session.AccessToken}
         return http_send("GET", url, None, "application/json", headers)
+
+    def get_item_detail(self, project_id, item_id):
+        self._ensure_token()
+        url = "https://developer.api.autodesk.com/data/v1/projects/{0}/items/{1}".format(
+            Uri.EscapeDataString(project_id),
+            Uri.EscapeDataString(item_id),
+        )
+        return self._get(url)
 
     def _ensure_token(self):
         if self._session.ExpiresAtUtc <= DateTime.UtcNow.AddMinutes(2):
@@ -695,14 +757,15 @@ class ProjectInfo(object):
 
 
 class FolderNode(object):
-    def __init__(self, folder_id, name, is_placeholder=False):
+    def __init__(self, folder_id, name, is_placeholder=False, is_up_level=False):
         self.Id = folder_id
         self.Name = name
         self.IsPlaceholder = is_placeholder
+        self.IsUpLevel = is_up_level
         self.Children = ObservableCollection[Object]()
         self.IsLoaded = False
         self.IsLoading = False
-        if not is_placeholder:
+        if not is_placeholder and not is_up_level:
             self.Children.Add(FolderNode("", "", True))
 
 
@@ -746,6 +809,7 @@ class AccDocsWindow(object):
         self.load_folder_button = self._window.FindName("LoadFolderButton")
         self.folder_tree = self._window.FindName("FolderTree")
         self.refresh_folders_button = self._window.FindName("RefreshFoldersButton")
+        self.refresh_files_button = self._window.FindName("RefreshFilesButton")
         self.file_list = self._window.FindName("FileList")
         self.excel_path_box = self._window.FindName("ExcelPathBox")
         self.excel_status_text = self._window.FindName("ExcelStatusText")
@@ -765,6 +829,7 @@ class AccDocsWindow(object):
 
         self._folder_nodes = ObservableCollection[Object]()
         self._file_items = ObservableCollection[Object]()
+        self._folder_nav_stack = []
         self.folder_tree.ItemsSource = self._folder_nodes
         self.file_list.ItemsSource = self._file_items
 
@@ -773,6 +838,7 @@ class AccDocsWindow(object):
         self._data_client = None
         self._excel_rows = None
         self._auth_in_progress = False
+        self._last_selected_folder_id = None
         self._config = pyrevit_script.get_config()
 
         self.login_button.Click += self.on_sign_in
@@ -780,7 +846,10 @@ class AccDocsWindow(object):
         self.project_combo.SelectionChanged += self.on_project_changed
         self.folder_tree.SelectedItemChanged += self.on_folder_selected
         self.folder_tree.AddHandler(TreeViewItem.ExpandedEvent, RoutedEventHandler(self.on_folder_expanded))
+        self.folder_tree.MouseDoubleClick += MouseButtonEventHandler(self.on_folder_double_click)
         self.refresh_folders_button.Click += self.on_refresh_folders
+        if self.refresh_files_button:
+            self.refresh_files_button.Click += self.on_refresh_files
         self.browse_excel_button.Click += self.on_browse_excel
         self.apply_button.Click += self.on_apply_descriptions
         if self.load_folder_button:
@@ -896,6 +965,7 @@ class AccDocsWindow(object):
             self._data_client = data_client
 
             self.status_text.Text = "Signed in (cached)"
+            self.log("Using cached token.")
             self.hub_combo.IsEnabled = True
             self.project_combo.IsEnabled = True
             self.folder_tree.IsEnabled = True
@@ -1015,6 +1085,7 @@ class AccDocsWindow(object):
                     self._data_client = data_client
 
                     self.status_text.Text = "Signed in"
+                    self.log("Signed in successfully.")
                     self.hub_combo.IsEnabled = True
                     self.project_combo.IsEnabled = True
                     self.folder_tree.IsEnabled = True
@@ -1074,6 +1145,10 @@ class AccDocsWindow(object):
         try:
             self.status_text.Text = "Loading projects..."
             projects = self._data_client.get_projects(hub.Id)
+            try:
+                projects = sorted(projects, key=lambda p: (p.Name or "").lower())
+            except Exception:
+                pass
             self.project_combo.ItemsSource = self._as_collection(projects)
             self.project_combo.DisplayMemberPath = "Name"
             self.project_combo.SelectedValuePath = "Id"
@@ -1097,10 +1172,22 @@ class AccDocsWindow(object):
             self.status_text.Text = "Loading folders..."
             self._folder_nodes.Clear()
             self._file_items.Clear()
+            self._folder_nav_stack = []
+            self._last_selected_folder_id = None
 
             top_folders = self._data_client.get_top_folders(hub.Id, project.Id)
             for folder in top_folders:
+                try:
+                    if folder.Children is not None and folder.Children.Count == 0:
+                        folder.Children.Add(FolderNode("", "", True))
+                except Exception:
+                    pass
                 self._folder_nodes.Add(folder)
+                try:
+                    count = folder.Children.Count if folder.Children is not None else 0
+                    self.log("Top folder '{0}' children={1}".format(folder.Name, count))
+                except Exception:
+                    pass
 
             # Auto-expand Project Files if available
             for folder in top_folders:
@@ -1127,8 +1214,14 @@ class AccDocsWindow(object):
             return
 
         try:
+            self.log("Loading subfolders for '{0}'...".format(node.Name))
             node.IsLoading = True
             self._expand_folder_node(project.Id, node)
+            try:
+                count = node.Children.Count if node.Children is not None else 0
+                self.log("Loaded {0} subfolder(s) under '{1}'.".format(count, node.Name))
+            except Exception:
+                pass
         except Exception as ex:
             self.log("Failed to expand folder: {0}".format(ex))
         finally:
@@ -1145,15 +1238,114 @@ class AccDocsWindow(object):
         node = args.NewValue
         if node is None:
             return
+        if getattr(node, "IsUpLevel", False):
+            return
 
         project = self.project_combo.SelectedItem
         if project is None:
             return
 
         try:
+            try:
+                count = node.Children.Count if node.Children is not None else 0
+                self.log("Folder selected '{0}' children={1}".format(node.Name, count))
+            except Exception:
+                pass
+            if self._last_selected_folder_id == node.Id:
+                try:
+                    self.log("Reselected same folder; refreshing files.")
+                except Exception:
+                    pass
+            self._last_selected_folder_id = node.Id
+            self._load_files_for_folder(project.Id, node)
+        except Exception as ex:
+            self.log("Failed to load files: {0}".format(ex))
+            self.status_text.Text = "File load failed"
+
+    def on_folder_double_click(self, sender, args):
+        try:
+            node = self.folder_tree.SelectedItem
+        except Exception:
+            node = None
+        if node is None:
+            return
+        if getattr(node, "IsUpLevel", False):
+            try:
+                if self._folder_nav_stack:
+                    previous = self._folder_nav_stack.pop()
+                    self._folder_nodes.Clear()
+                    for item in previous:
+                        self._folder_nodes.Add(item)
+                    self.status_text.Text = "Folders loaded"
+                    self.log("Returned to previous folder level.")
+            except Exception as ex:
+                self.log("Failed to return to previous level: {0}".format(ex))
+            return
+
+        project = self.project_combo.SelectedItem
+        if project is None:
+            return
+
+        try:
+            self.log("Double-clicked folder '{0}' - loading subfolders...".format(node.Name))
+        except Exception:
+            pass
+
+        try:
+            if not node.IsLoaded:
+                self._expand_folder_node(project.Id, node)
+            try:
+                children = [c for c in node.Children if not getattr(c, "IsPlaceholder", False)]
+            except Exception:
+                children = []
+            try:
+                self.log("Loaded {0} subfolder(s) under '{1}'.".format(len(children), node.Name))
+            except Exception:
+                pass
+            if children:
+                try:
+                    self._folder_nav_stack.append(list(self._folder_nodes))
+                    self._folder_nodes.Clear()
+                    up = FolderNode("", "..", False, True)
+                    try:
+                        up.Children.Clear()
+                    except Exception:
+                        pass
+                    self._folder_nodes.Add(up)
+                    for child in children:
+                        self._folder_nodes.Add(child)
+                    self.status_text.Text = "Folders loaded"
+                except Exception as ex:
+                    self.log("Failed to show subfolders for '{0}': {1}".format(getattr(node, "Name", ""), ex))
+            else:
+                self.log("No subfolders under '{0}'.".format(getattr(node, "Name", "")))
+        except Exception as ex:
+            self.log("Failed to load subfolders for '{0}': {1}".format(getattr(node, "Name", ""), ex))
+
+    def on_refresh_folders(self, sender, args):
+        self.load_top_folders()
+
+    def on_refresh_files(self, sender, args):
+        project = self.project_combo.SelectedItem
+        if project is None:
+            return
+        try:
+            node = self.folder_tree.SelectedItem
+        except Exception:
+            node = None
+        if node is None or getattr(node, "IsUpLevel", False):
+            return
+        try:
+            self.log("Refreshing files for '{0}'...".format(node.Name))
+        except Exception:
+            pass
+        self._load_files_for_folder(project.Id, node)
+
+    def _load_files_for_folder(self, project_id, node):
+        try:
             self.status_text.Text = "Loading files..."
             self._file_items.Clear()
-            files = self._data_client.get_files_in_folder(project.Id, node.Id)
+            files = self._data_client.get_files_in_folder(project_id, node.Id)
             for item in files:
                 self._file_items.Add(item)
             if files:
@@ -1163,9 +1355,6 @@ class AccDocsWindow(object):
         except Exception as ex:
             self.log("Failed to load files: {0}".format(ex))
             self.status_text.Text = "File load failed"
-
-    def on_refresh_folders(self, sender, args):
-        self.load_top_folders()
 
     def on_load_folder_url(self, sender, args):
         if not self._data_client:
@@ -1306,7 +1495,53 @@ class AccDocsWindow(object):
                 continue
 
             try:
-                self._data_client.update_file_description(project.Id, file_item.Id, row.Description)
+                try:
+                    desc_preview = row.Description if row.Description is not None else ""
+                    if len(desc_preview) > 120:
+                        desc_preview = desc_preview[:117] + "..."
+                    self.log("Updating: {0} | type={1} | item_id={2} | desc_len={3} | desc='{4}'".format(
+                        file_item.DisplayName,
+                        file_item.ExtensionType,
+                        file_item.Id,
+                        len(row.Description or ""),
+                        desc_preview,
+                    ))
+                except Exception:
+                    pass
+                try:
+                    item_json = self._data_client.get_item_detail(project.Id, file_item.Id)
+                    item_root = json.loads(item_json) if item_json else {}
+                    item_data = item_root.get("data", {}) if isinstance(item_root, dict) else {}
+                    item_attrs = item_data.get("attributes", {}) if isinstance(item_data, dict) else {}
+                    ext = item_attrs.get("extension", {}) if isinstance(item_attrs, dict) else {}
+                    ext_type = ext.get("type", "")
+                    ext_data = ext.get("data", {}) if isinstance(ext, dict) else {}
+                    current_desc = ext_data.get("description", "")
+                    tip = None
+                    try:
+                        rel = item_data.get("relationships", {}) if isinstance(item_data, dict) else {}
+                        tip_rel = rel.get("tip", {}) if isinstance(rel, dict) else {}
+                        tip_data = tip_rel.get("data", {}) if isinstance(tip_rel, dict) else {}
+                        tip = tip_data.get("id", None)
+                    except Exception:
+                        tip = None
+                    self.log("Pre-update item: ext_type='{0}' desc='{1}' tip='{2}'".format(ext_type, current_desc, tip or ""))
+                except Exception as ex:
+                    self.log("Pre-update fetch failed: {0}".format(ex))
+                    item_data = {}
+                    tip = None
+
+                if file_item.ExtensionType == "items:autodesk.bim360:C4RModel":
+                    skipped += 1
+                    self.log("Skipped (C4RModel not supported for description update): {0}".format(item_label))
+                    continue
+
+                if not tip:
+                    skipped += 1
+                    self.log("Skipped (missing tip version id): {0}".format(item_label))
+                    continue
+
+                self._data_client.update_version_description(project.Id, tip, row.Description)
                 file_item.Description = row.Description
                 updated += 1
                 self.log("Updated: {0}".format(item_label))

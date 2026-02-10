@@ -30,15 +30,18 @@
 
         <HierarchicalDataTemplate x:Key="FolderTemplate" ItemsSource="{Binding Children}">
             <StackPanel x:Name="FolderRow" Orientation="Horizontal" VerticalAlignment="Center">
-                <Viewbox Width="16" Height="16">
+                <Viewbox x:Name="FolderIcon" Width="16" Height="16">
                     <Path Fill="#F2C94C" Stroke="#C28F2C" StrokeThickness="0.8"
                           Data="M2,6 H9 L11,8 H22 V20 H2 Z" />
                 </Viewbox>
-                <TextBlock Text="{Binding Name}" Margin="6,0,0,0" />
+                <TextBlock x:Name="FolderName" Text="{Binding Name}" Margin="6,0,0,0" />
             </StackPanel>
             <HierarchicalDataTemplate.Triggers>
                 <DataTrigger Binding="{Binding IsPlaceholder}" Value="True">
-                    <Setter TargetName="FolderRow" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="FolderName" Property="Text" Value="Loading..." />
+                    <Setter TargetName="FolderName" Property="FontStyle" Value="Italic" />
+                    <Setter TargetName="FolderName" Property="Foreground" Value="#8B8B8B" />
+                    <Setter TargetName="FolderIcon" Property="Opacity" Value="0.35" />
                 </DataTrigger>
             </HierarchicalDataTemplate.Triggers>
         </HierarchicalDataTemplate>
@@ -112,7 +115,6 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="160" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" Background="#FFFFFF" CornerRadius="10" Padding="12" Margin="0,0,0,10">
@@ -122,23 +124,43 @@
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="1" Background="#FFFFFF" CornerRadius="10" Padding="12" Margin="0,0,0,10">
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Files in Selected Folder" FontWeight="SemiBold" Margin="0,0,0,8" />
-                    <ListView x:Name="FileList">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="File" CellTemplate="{StaticResource FileTemplate}" Width="260" />
-                                <GridViewColumn Header="Type" DisplayMemberBinding="{Binding ExtensionType}" Width="200" />
-                                <GridViewColumn Header="Description" DisplayMemberBinding="{Binding Description}" Width="260" />
-                                <GridViewColumn Header="Item Id" DisplayMemberBinding="{Binding Id}" Width="360" />
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
-                </DockPanel>
-            </Border>
+            <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="6" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-            <Border Grid.Row="2" Background="#FFFFFF" CornerRadius="10" Padding="12" Margin="0,0,0,10">
+                <Border Grid.Row="0" Background="#FFFFFF" CornerRadius="10" Padding="12" Margin="0,0,0,10">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <TextBlock Text="Files in Selected Folder" FontWeight="SemiBold" />
+                            <Button x:Name="RefreshFilesButton" Content="Refresh Files" Width="110" Height="26" Margin="10,0,0,0" HorizontalAlignment="Right" />
+                        </DockPanel>
+                        <ListView x:Name="FileList">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="File" CellTemplate="{StaticResource FileTemplate}" Width="260" />
+                                    <GridViewColumn Header="Type" DisplayMemberBinding="{Binding ExtensionType}" Width="200" />
+                                    <GridViewColumn Header="Description" DisplayMemberBinding="{Binding Description}" Width="260" />
+                                    <GridViewColumn Header="Item Id" DisplayMemberBinding="{Binding Id}" Width="360" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </DockPanel>
+                </Border>
+
+                <GridSplitter Grid.Row="1" Height="6" HorizontalAlignment="Stretch" VerticalAlignment="Center" Background="#E0E0E0" />
+
+                <Border Grid.Row="2" Background="#FFFFFF" CornerRadius="10" Padding="12">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Top" Text="Log" FontWeight="SemiBold" Margin="0,0,0,6" />
+                        <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" />
+                    </DockPanel>
+                </Border>
+            </Grid>
+
+            <Border Grid.Row="2" Background="#FFFFFF" CornerRadius="10" Padding="12" Margin="0,10,0,0">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -153,13 +175,6 @@
                     <Button x:Name="BrowseExcelButton" Grid.Column="1" Content="Browse" Height="30" Margin="8,18,8,0" />
                     <Button x:Name="ApplyButton" Grid.Column="2" Content="Apply Descriptions" Height="30" Margin="8,18,0,0" />
                 </Grid>
-            </Border>
-
-            <Border Grid.Row="3" Background="#FFFFFF" CornerRadius="10" Padding="12">
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Log" FontWeight="SemiBold" Margin="0,0,0,6" />
-                    <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" />
-                </DockPanel>
             </Border>
         </Grid>
     </Grid>
