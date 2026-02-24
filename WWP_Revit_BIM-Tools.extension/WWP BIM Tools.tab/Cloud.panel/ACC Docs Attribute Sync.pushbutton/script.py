@@ -1541,12 +1541,14 @@ class AccDocsWindow(object):
                     self.log("Skipped (C4RModel not supported for description update): {0}".format(item_label))
                     continue
 
-                if not tip:
+                effective_ext_type = ext_type if ext_type else file_item.ExtensionType
+                if effective_ext_type == "items:autodesk.bim360:File":
+                    self._data_client.update_file_description(project.Id, file_item.Id, row.Description)
+                else:
                     skipped += 1
-                    self.log("Skipped (missing tip version id): {0}".format(item_label))
+                    self.log("Skipped (extension type not supported for description update): {0}".format(item_label))
                     continue
 
-                self._data_client.update_version_description(project.Id, tip, row.Description)
                 file_item.Description = row.Description
                 updated += 1
                 self.log("Updated: {0}".format(item_label))
