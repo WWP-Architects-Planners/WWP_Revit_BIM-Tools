@@ -741,40 +741,6 @@ class AccDataClient(object):
             pass
         http_send("PATCH", url, body, "application/vnd.api+json", headers)
 
-    def update_item_display_name(self, project_id, item_id, display_name):
-        self._ensure_token()
-        url = "https://developer.api.autodesk.com/data/v1/projects/{0}/items/{1}".format(
-            Uri.EscapeDataString(project_id),
-            Uri.EscapeDataString(item_id),
-        )
-
-        body = json.dumps({
-            "jsonapi": {"version": "1.0"},
-            "data": {
-                "type": "items",
-                "id": item_id,
-                "attributes": {
-                    "displayName": display_name,
-                },
-            },
-        })
-
-        headers = {"Authorization": "Bearer " + self._session.AccessToken}
-        try:
-            name_preview = display_name if display_name is not None else ""
-            if len(name_preview) > 120:
-                name_preview = name_preview[:117] + "..."
-            self._log("PATCH item displayName: item_id={0} name_len={1} name='{2}'".format(
-                item_id,
-                len(display_name or ""),
-                name_preview,
-            ))
-            self._log("PATCH url: {0}".format(url))
-            self._log("PATCH body: {0}".format(body))
-        except Exception:
-            pass
-        http_send("PATCH", url, body, "application/vnd.api+json", headers)
-
     def update_version_description(self, project_id, version_id, description):
         self._ensure_token()
         url = "https://developer.api.autodesk.com/data/v1/projects/{0}/versions/{1}".format(
@@ -788,7 +754,11 @@ class AccDataClient(object):
                 "type": "versions",
                 "id": version_id,
                 "attributes": {
-                    "description": description,
+                    "extension": {
+                        "data": {
+                            "description": description,
+                        }
+                    }
                 },
             },
         })
@@ -1238,24 +1208,6 @@ class AccDocsWindow(object):
         self._custom_attr_defs = defs_map
         self._custom_attr_defs_folder_id = folder_id
         return defs_map
-        try:
-            samples = diag.get("samples") or []
-            for idx, sample in enumerate(samples):
-                file_val = sample[0] if len(sample) > 0 else ""
-                desc_val = sample[1] if len(sample) > 1 else ""
-                self.log("Excel sample {0}: file='{1}' desc='{2}'".format(idx + 1, file_val, desc_val))
-        except Exception:
-            pass
-        try:
-            rows = diag.get("rows") or []
-            if rows:
-                self.log("Excel rows (A,B): showing up to {0}".format(len(rows)))
-            for idx, row in enumerate(rows):
-                file_val = row[0] if len(row) > 0 else ""
-                desc_val = row[1] if len(row) > 1 else ""
-                self.log("Excel row {0}: file='{1}' desc='{2}'".format(idx + 1, file_val, desc_val))
-        except Exception:
-            pass
 
     def on_sign_in(self, sender, args):
         client_id = (self.client_id_box.Text or "").strip()
@@ -1775,15 +1727,18 @@ class AccDocsWindow(object):
                         tip = None
 
                 if "description" in normalized_attrs:
-                    if file_item.ExtensionType and file_item.ExtensionType.startswith("items:autodesk.bim360"):
-                        self.log("Skipped description (BIM360 does not support patching version description): {0}".format(item_label))
-                        normalized_attrs.pop("description", None)
-                    elif file_item.ExtensionType == "items:autodesk.bim360:C4RModel":
+                    if file_item.ExtensionType == "items:autodesk.bim360:C4RModel":
                         self.log("Skipped description (C4RModel not supported): {0}".format(item_label))
                         normalized_attrs.pop("description", None)
                     elif not tip:
                         self.log("Skipped description (missing tip version id): {0}".format(item_label))
                         normalized_attrs.pop("description", None)
+                    elif file_item.ExtensionType and file_item.ExtensionType.startswith("items:autodesk.bim360"):
+                        # BIM360 PATCH /versions does not support description; use PATCH /items instead
+                        if "item_description" not in normalized_attrs:
+                            normalized_attrs["item_description"] = normalized_attrs.pop("description")
+                        else:
+                            normalized_attrs.pop("description", None)
 
                 applied = 0
                 if "description" in normalized_attrs and tip:
