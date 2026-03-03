@@ -1,0 +1,119 @@
+<Window
+    x:Class="ContextBuilder.WinUI.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:Microsoft.UI.Xaml.Controls"
+    mc:Ignorable="d"
+    Title="ContextBuilder">
+
+    <Grid RequestedTheme="Light" Padding="14">
+        <Grid.Resources>
+            <Style TargetType="ToggleSwitch" x:Key="RoundedFiveMmToggle">
+                <Setter Property="Width" Value="60" />
+                <Setter Property="OnContent" Value="" />
+                <Setter Property="OffContent" Value="" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
+        </Grid.Resources>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Padding="12" CornerRadius="10" Background="#FFF8F8F8" BorderThickness="1" BorderBrush="#FFD8D8D8">
+            <Grid ColumnSpacing="10" RowSpacing="8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox x:Name="AddressBox" Grid.Row="0" Grid.Column="0" Header="Address" PlaceholderText="Type address or click map below" />
+                <Button Grid.Row="0" Grid.Column="1" Content="Search" Click="SearchAddress_Click" Margin="0,24,0,0" VerticalAlignment="Top" />
+                <TextBox x:Name="RadiusMetersBox" Grid.Row="0" Grid.Column="2" Width="110" Header="Radius (m)" Text="500" TextChanged="RadiusMetersBox_TextChanged" />
+
+                <StackPanel Grid.Row="1" Grid.ColumnSpan="3" Orientation="Horizontal" Spacing="14">
+                    <TextBlock Text="Layers:" VerticalAlignment="Center" FontWeight="SemiBold" />
+                    <CheckBox x:Name="BuildingsCheck" Content="Buildings" IsChecked="True" />
+                    <CheckBox x:Name="RoadsCheck" Content="Roads" IsChecked="True" />
+                    <CheckBox x:Name="WaterCheck" Content="Water" IsChecked="True" />
+                    <CheckBox x:Name="ParksCheck" Content="Parks" IsChecked="True" />
+                    <CheckBox x:Name="ParcelsCheck" Content="Parcel" IsChecked="False" />
+                    <CheckBox x:Name="LidarTopoCheck" Content="LiDAR Toposurface" IsChecked="False" />
+                </StackPanel>
+
+                <Grid Grid.Row="2" Grid.ColumnSpan="3" ColumnSpacing="12" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Surface mode:" VerticalAlignment="Center" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1" Text="Flat" VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Column="2" x:Name="UseElevationToggle" Style="{StaticResource RoundedFiveMmToggle}" />
+                    <TextBlock Grid.Column="3" Text="With LiDAR / DEM elevation" VerticalAlignment="Center" />
+
+                    <TextBlock Grid.Column="4" Text="Source EPSG:" VerticalAlignment="Center" Margin="14,0,0,0" FontWeight="SemiBold" />
+                    <ComboBox Grid.Column="5" x:Name="SourceEpsgCombo" Width="210" MinWidth="210" VerticalAlignment="Center" SelectedIndex="0">
+                        <ComboBoxItem Content="EPSG:4326 (WGS84)" />
+                        <ComboBoxItem Content="EPSG:3857 (WebMercator)" />
+                    </ComboBox>
+
+                    <TextBlock Grid.Column="6" Text="Convert to Target EPSG:" VerticalAlignment="Center" Margin="14,0,0,0" FontWeight="SemiBold" />
+                    <ToggleSwitch Grid.Column="7" x:Name="EnableTargetEpsgToggle" Style="{StaticResource RoundedFiveMmToggle}" IsOn="False" Toggled="EnableTargetEpsgToggle_Toggled" />
+                    <TextBox Grid.Column="8" x:Name="TargetEpsgInputBox" Width="120" VerticalAlignment="Center" PlaceholderText="EPSG #" Text="3857" IsEnabled="False" />
+
+                    <Button Grid.Column="9" Content="Audit Sources" Click="AuditSources_Click" Margin="14,0,0,0" />
+                    <TextBlock Grid.Column="10" Text="OBJ is recommended for Rhino." VerticalAlignment="Center" Foreground="#FF555555" />
+                </Grid>
+
+                <Border Grid.Row="3" Grid.ColumnSpan="3" Margin="0,4,0,0" Padding="8" CornerRadius="8" Background="#FFFFFFFF" BorderThickness="1" BorderBrush="#FFD8D8D8">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Download Extent (bounding box)" FontWeight="SemiBold" />
+                        <TextBlock x:Name="ExtentText" Text="Pick a map point to show extent." TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <controls:WebView2 x:Name="MapView" Grid.Row="1" Margin="0,12,0,12" />
+
+        <Border Grid.Row="2" Padding="10" CornerRadius="10" Background="#FFF8F8F8" BorderThickness="1" BorderBrush="#FFD8D8D8">
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusText" Grid.Column="0" Text="Pick a location on the map or search an address." VerticalAlignment="Center" TextWrapping="Wrap" />
+                <Button x:Name="Export2dButton" Grid.Column="1" Content="Export 2D (SVGs)" Click="Export2d_Click" />
+                <Button x:Name="Export3dButton" Grid.Column="2" Content="Export 3D (OBJ)" Click="Export3d_Click" />
+                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Text="GIS:" VerticalAlignment="Center" />
+                    <TextBlock Text="GeoJSON" VerticalAlignment="Center" />
+                    <ToggleSwitch x:Name="UseGeoPackageToggle" Style="{StaticResource RoundedFiveMmToggle}" />
+                    <TextBlock Text="GeoPackage" VerticalAlignment="Center" />
+                    <Button x:Name="ExportGisButton" Content="Export GIS" Click="ExportGis_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

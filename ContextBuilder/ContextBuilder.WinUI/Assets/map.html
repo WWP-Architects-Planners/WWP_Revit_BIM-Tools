@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ContextBuilder Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    .hint {
+      position: absolute;
+      z-index: 999;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid #d0d0d0;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font: 12px/1.2 "Segoe UI", sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div class="hint">Click map to pick context center</div>
+  <div id="map"></div>
+  <script>
+    const map = L.map("map", { zoomControl: true }).setView([43.6532, -79.3832], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    let marker = null;
+    let extentRect = null;
+
+    function setMapPin(lat, lon) {
+      if (marker) {
+        marker.setLatLng([lat, lon]);
+      } else {
+        marker = L.marker([lat, lon]).addTo(map);
+      }
+      map.setView([lat, lon], 16);
+    }
+
+    function setExtentBox(swLat, swLon, neLat, neLon) {
+      const bounds = [[swLat, swLon], [neLat, neLon]];
+      if (extentRect) {
+        extentRect.setBounds(bounds);
+      } else {
+        extentRect = L.rectangle(bounds, {
+          color: "#1f78ff",
+          weight: 2,
+          fillColor: "#1f78ff",
+          fillOpacity: 0.08
+        }).addTo(map);
+      }
+    }
+
+    function postPick(lat, lon) {
+      const payload = { type: "picked", lat: lat, lon: lon };
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage(payload);
+      }
+    }
+
+    map.on("click", (e) => {
+      const lat = e.latlng.lat;
+      const lon = e.latlng.lng;
+      setMapPin(lat, lon);
+      postPick(lat, lon);
+    });
+
+    window.setMapPin = setMapPin;
+    window.setExtentBox = setExtentBox;
+  </script>
+</body>
+</html>

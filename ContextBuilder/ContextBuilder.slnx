@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ContextBuilder.WinUI/ContextBuilder.WinUI.csproj" />
+  <Project Path="ContextBuilder.RhinoPlugin/ContextBuilder.RhinoPlugin.csproj" />
+</Solution>
