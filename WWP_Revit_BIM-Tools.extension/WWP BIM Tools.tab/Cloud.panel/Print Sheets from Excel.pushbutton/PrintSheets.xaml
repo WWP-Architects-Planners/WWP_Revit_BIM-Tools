@@ -218,9 +218,10 @@
                     </ComboBox>
                 </DockPanel>
             </GroupBox>
-            <GroupBox Header="Excel Database" Margin="0,10,5,0" Padding="8">
+            <GroupBox Header="CSV Database" Margin="0,10,5,0" Padding="8">
                 <Grid>
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -231,10 +232,12 @@
                         <ColumnDefinition Width="140" />
                     </Grid.ColumnDefinitions>
                     <TextBlock Grid.Row="0" Grid.ColumnSpan="3" Text="Column A: Printed File Name (override), Column B: Drawing Name, Column C: Drawing Number" TextWrapping="Wrap" />
-                    <CheckBox x:Name="excel_writeback_cb" Grid.Row="1" Grid.ColumnSpan="3" Content="Write back to Excel after print" Margin="0,4,0,0" IsChecked="True" />
+                    <CheckBox x:Name="excel_writeback_cb" Grid.Row="1" Grid.ColumnSpan="3" Content="Write to CSV before print" Margin="0,4,0,0" IsChecked="True" />
                     <TextBox x:Name="excel_path_tb" Grid.Row="2" Grid.Column="0" IsReadOnly="True" Margin="0,4,10,0" VerticalContentAlignment="Center"/>
                     <Button x:Name="excel_browse_b" Grid.Row="2" Grid.Column="1" Content="Browse" Margin="0,4,10,0" Click="browse_excel"/>
                     <Button x:Name="excel_generate_b" Grid.Row="2" Grid.Column="2" Content="Generate/Update" Margin="0,4,0,0" Click="generate_excel"/>
+                    <CheckBox x:Name="csv_include_ext_cb" Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" Content="Include file extension in Printed File Name" Margin="0,4,10,0" IsChecked="False" />
+                    <Button x:Name="excel_dryrun_b" Grid.Row="3" Grid.Column="2" Content="CSV Only (Dry Run)" Margin="0,4,0,0" Click="write_excel_dry_run"/>
                 </Grid>
             </GroupBox>
             <GroupBox Header="Schedule One-Time Print" Margin="0,10,5,0" Padding="8">

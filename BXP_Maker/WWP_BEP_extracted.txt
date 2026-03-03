@@ -1,0 +1,999 @@
+
+BIM
+EXECUTION
+PLAN
+118 Project Avenue
+4926671149796500Project Address
+DOCUMENT MANAGEMENT
+Revisions
+1
+2024-10-10
+Dan Abad
+Project Set Up
+2
+3
+4
+5
+6
+ TOC \o "1-2" \h \z \u NOTEBOOK A	  Project Management	 PAGEREF _Toc218268585 \h 5
+		A.1	Scope of BEP	 PAGEREF _Toc218268586 \h 6
+		A.2	Overview	 PAGEREF _Toc218268587 \h 6
+		A.3	Disclaimers and clarifications	 PAGEREF _Toc218268588 \h 6
+		A.4	Project Information	 PAGEREF _Toc218268589 \h 6
+		A.5	Project Stakeholders	 PAGEREF _Toc218268590 \h 6
+		A.6	Roles and Responsibilities	 PAGEREF _Toc218268591 \h 7
+		A.7	Project Phases/Milestones/Issuances	 PAGEREF _Toc218268592 \h 9
+		A.8	Meetings, Communication, and Collaboration	 PAGEREF _Toc218268593 \h 10
+		A.9	Software and IT Resources	 PAGEREF _Toc218268594 \h 10
+		A.10	Post-Mortem meeting	 PAGEREF _Toc218268595 \h 11
+NOTEBOOK B	  Design Collaboration	 PAGEREF _Toc218268596 \h 12
+		B.1	Reminders of Good Practices	 PAGEREF _Toc218268597 \h 13
+		B.2	BIM Responsibilities and Scopes by Discipline	 PAGEREF _Toc218268598 \h 13
+		B.3	Home Page, Modeling History and Autopublishing	 PAGEREF _Toc218268599 \h 13
+		B.4	Information Exchange &amp; Scheduling	 PAGEREF _Toc218268600 \h 13
+		B.5	Collaboration Strategy	 PAGEREF _Toc218268601 \h 15
+		B.6	Procedure for Saving and Archiving Models	 PAGEREF _Toc218268602 \h 17
+		B.7	Geo-Referencing, Project Origin and North.	 PAGEREF _Toc218268603 \h 17
+		B.8	Level of Development	 PAGEREF _Toc218268604 \h 18
+NOTEBOOK C	  Modeling Standards	 PAGEREF _Toc218268605 \h 19
+		C.1	Model Nomenclature	 PAGEREF _Toc218268606 \h 20
+		C.2	Shared Settings	 PAGEREF _Toc218268607 \h 20
+		C.3	Linking Revit	 PAGEREF _Toc218268608 \h 20
+		C.4	Linking DWG	 PAGEREF _Toc218268609 \h 20
+		C.5	Worksets	 PAGEREF _Toc218268610 \h 20
+		C.6	Phasing	 PAGEREF _Toc218268611 \h 22
+		C.7	Levels	 PAGEREF _Toc218268612 \h 22
+		C.8	Gridlines	 PAGEREF _Toc218268613 \h 23
+		C.9	Matchlines	 PAGEREF _Toc218268614 \h 23
+		C.10	Project Units	 PAGEREF _Toc218268615 \h 24
+		C.11	Dimension Syles and Precision	 PAGEREF _Toc218268616 \h 24
+		C.12	Sheet Size	 PAGEREF _Toc218268617 \h 24
+		C.13	Drawing Scale	 PAGEREF _Toc218268618 \h 25
+		C.14	Font	 PAGEREF _Toc218268619 \h 25
+		C.15	Documentation for Special Scenarios	 PAGEREF _Toc218268620 \h 25
+NOTEBOOK D	  Model Clash Detection	 PAGEREF _Toc218268621 \h 26
+		D.1	Clash Detection Roles and Responsibilities	 PAGEREF _Toc218268622 \h 27
+		D.2	Clash Detection Phase Schedule and Milestones	 PAGEREF _Toc218268623 \h 27
+		D.3	Clash Detection Common Data Environment	 PAGEREF _Toc218268624 \h 27
+		D.4	Clash Detection Lead	 PAGEREF _Toc218268625 \h 27
+		D.5	Level of Development (LOD)	 PAGEREF _Toc218268626 \h 27
+		D.6	Information Exchange and Scheduling	 PAGEREF _Toc218268627 \h 27
+		D.7	Revit Publish Settings for Collaboration	 PAGEREF _Toc218268628 \h 27
+		D.8	ACC Model Coordination Module - Set Up	 PAGEREF _Toc218268629 \h 28
+		D.9	ACC Model Coordination - Issue Tracking	 PAGEREF _Toc218268630 \h 28
+		D.10	Documentation for Special Scenarios	 PAGEREF _Toc218268631 \h 29
+NOTEBOOK E	  Appendices	 PAGEREF _Toc218268632 \h 30
+		Appendix A	Glossary	 PAGEREF _Toc218268633 \h 31
+		Appendix B	Abbreviations	 PAGEREF _Toc218268634 \h 33
+		Appendix C	Definitions	 PAGEREF _Toc218268635 \h 33
+		Appendix D	LOD	 PAGEREF _Toc218268636 \h 33
+		Appendix E	Syncing, Publishing, Sharing, Consuming in ACC	 PAGEREF _Toc218268637 \h 34
+		E.1	Autodesk Construction Cloud Docs Module	 PAGEREF _Toc218268638 \h 34
+		E.2	Uploading a Revit file	 PAGEREF _Toc218268639 \h 35
+		E.3	Sharing Process	 PAGEREF _Toc218268640 \h 35
+		E.4	Publishing Models	 PAGEREF _Toc218268641 \h 36
+		E.5	Sharing Models	 PAGEREF _Toc218268642 \h 36
+		E.6	Consuming Models	 PAGEREF _Toc218268643 \h 36
+190509048750052298608074660left-91767600Project Management 
+Scope of BEP
+SvN Architects + Planners aims to use Building Information Modeling (BIM) to increase the quality and consistency of our deliverables, increase the refinement of coordination between consultants and increase the overall quality of design in our projects.
+Overview
+This BIM Execution Plan (BEP) is intended to provide the Project Team with an understanding of agreed expectations with regards to the BIM process, including opportunities to have clarity and effective collaboration among participants. 
+It is meant to be a “living” document that establishes collective agreements by the project participants to the BIM process, allowing them to customize and incorporate their individual needs as well as to document project specific workflows as agreed on by the entire team. As such, the BEP is provided to the team as an editable document so that it may be filled in and customized. 
+The BEP is recommended to be reviewed at every milestone submission. 
+Disclaimers and clarifications
+Client can insert disclaimer here.
+Project Information
+Project Number (SvN Internal):
+Project Name:
+118 Project Avenue
+Project Address:
+Project Owner/Client:
+Project Type:
+Contract Type: 
+Project Description: 
+Project Stakeholders
+Main Contacts
+The following table identifies the primary point of contact, within each organization, responsible for BIM process during the project. Members may fill multiple project roles. Please refer to next section for detailed contact information. Disciplines not directly involved in BIM may be left out of directories.  
+Organization
+Location(s)
+Lead contact
+OWNER/CLIENT
+ARCHITECTURAL
+CIVIL 
+LANDSCAPE 
+STRUCTURAL 
+MECHANICAL 
+ELECTRICAL 
+CONSTRUCTION MANAGER
+Roles and Responsibilities
+Roles
+Roles are defined as follows, one person may be filling multiple roles:Discipline Lead – Project’s Design Architect or Engineer of RecordProject Manager (PM) – Individual(s) overseeing the project. BIM Manager – Individual(s) responsible for agreed model standard enforcement and performing information exchanges as defined in this documentJob Captain – Individual(s) intimately familiar with model production (user). Contacted if information regarding specific modeling practices or workflows is required.
+Company
+Role
+Name
+Email
+Time zone 
+Phone
+OWNER/CLIENT
+Lead
+Project Manager
+ARCHITECTURAL
+Discipline Lead
+Project Manager
+BIM Manager 
+Design Captain
+INTERIOR DESIGN
+Discipline Lead
+Project Manager
+BIM Manager
+Design Captain
+LANDSCAPE
+Discipline Lead
+Project Manager
+BIM Manager
+Design Captain
+STRUCTURAL
+Discipline Lead
+Project Manager
+BIM Manager
+Design Captain
+MECHANICAL
+Discipline Lead
+Project Manager
+BIM Manager
+Design Captain
+ELECTRICAL
+Discipline Lead
+Project Manager
+BIM Manager
+Design Captain
+CONSTRUCTION MANAGER
+Discipline Lead
+Project Manager
+BIM Manager
+Job Captain
+Responsibilities
+Discipline Lead
+Communication with the Client
+Coordination with other disciplines 
+Project Manager
+Communication with the Client
+Coordinate timeline of information sharing with all disciplines at set dates and well in advance of milestones for coordination. 
+Use BIM tools for clash detection on design documents. 
+BIM Manager
+Establishing the model is set up with the correct project origin, coordinate system and units
+Model troubleshooting (i.e.: Worksets, visibility issues, family and component content
+Maintaining BIM standards and conducting quality control reviews
+Obtaining and linking consultant models
+Maintaining and organizing file storage location
+Coordinate process for transferring and exchanging models
+Provision of access rights for shared platforms
+Maintaining BIM archives and back-up
+Coordinating Revit version upgrades during the project
+Model troubleshooting (i.e.: Worksets, visibility issues, family and component content)
+Coordinating any changes to the BIM Execution plan
+Implementing the BIM Execution Plan
+Coordinating BIM related meetings
+Interfacing with IT Staff to ensure proper hardware and software is in place and functioning properly
+Job Captain
+Updating the BIM model
+Coordinating BIM workflow with internal team
+Submitting BIM model at weekly intervals and at assigned milestones
+Modeling to the assigned Level of Development
+Maintaining integrity of their discipline’s model
+Provide narrative of changes/modifications during model exchange process
+IT Staff
+Setting up model sharing platform specific to project (FTP)
+Coordinating training for staff members as required
+Maintaining Revit libraries and template folders
+Facilitating Revit version upgrades only when required
+Licensing for software
+Project Phases/Milestones/Issuances
+[Insert project plan schedule, deliverables, and issuances here]
+PROJECT PHASE / MILESTONE
+DURATION
+ESTIMATED START DATE
+ESTIMATED COMPLETION DATE
+RESPONSIBLE PARTY
+DELIVERABLE
+DDP
+DDP SUBMISSION
+DD
+CD
+20%
+60%
+70%
+95%
+IFT COMPLETE
+CA
+PROJECT PHASE / MILESTONE
+JAN
+FEB
+MAR
+APR
+MAY
+JUN
+JUL
+AUG
+SEP
+OCT
+NOV
+DEC
+JAN
+FEB
+MAR
+APR
+MAY
+JUN
+JUL
+AUG
+SEP
+OCT
+NOV
+DEC
+DDP
+DDP SUBMISSION
+•
+•
+DD
+CD
+20%
+•
+•
+60%
+•
+70%
+•
+95%
+•
+IFT COMPLETE
+•
+CA
+Meetings, Communication, and Collaboration
+Kick Off Meeting
+SvN Architects + Planners will set a BIM kick-off meeting to review the BEP and discuss the collaboration strategy for the project. All BIM Managers from the Consultant team along with the Construction Manager and the Client will be required to attend. This meeting will review project coordination requirements as well as define the coordination process.
+KICK-OFF MEETING DATE:
+FOLLOW UP MEETING DATE:
+Meeting and Collaboration schedule
+Day
+Time
+Task
+Week 1
+Wednesday
+4:00pm EDT
+Consultant Coordination Meeting
+Week 1
+Friday
+6:00 pm EDT
+Models Auto-Publish
+Week 2 
+Wednesday
+4:00pm EDT
+Consultant Coordination Meeting
+Week 2
+Friday
+6:00 pm EDT
+Models Auto-Publish
+Software and IT Resources
+Approved Software builds
+Software
+Version
+(incl. Build)
+Bim use 
+Discipline
+Autodesk Revit
+[Version]
+[Architectural]
+[Civil]
+[Electrical]
+[General Contractor] [Survey]
+[Interior Design]
+[Landscape]
+[Mechanical]
+[Structural]
+[Transportation]
+[Urban Design]
+Autodesk AutoCAD
+[Version]
+[Early schematic design, Use by consultants not using Revit]
+Autodesk Civil 3D
+[Version]
+Autodesk Desktop Connector
+[Version]
+Bluebeam Revu
+[Version]
+[Clash detection/Markups]
+Upgrades + Hot Fixes
+During the project new versions of application software may become available. Upgrading of models or project data to newer versions should be reviewed with all team members to ensure compatibility. If the team decides an upgrade is beneficial to the project a protocol will be developed, tested (in a non-production environment), outlined in this document and performed upon written agreement by all team members.  
+Consultants upgrading or using platforms not listed above without following the procedures outlined above will be responsible for the time costs incurred to each Consultant because of the upgrade or will be required to return to a model from pre-upgrade to continue working with, at no cost to the Project Budget.
+Post-Mortem meeting
+SvN will conduct a Post-Mortem meeting after major project milestones and important submission to client or authorities. The purpose of these meetings is to bring up any major issues in collaborations that could be improved for future submission. The Post-Mortem meetings will be performed at the following milestone submissions:
+30% CD POST-MORTEM DATE:
+60% CD POST-MORTEM DATE:
+left8676390052301398075778left-91404500Design Collaboration 
+Reminders of Good Practices
+This section outlines key practices that promote collaboration, accuracy, and efficiency in Building Information Modeling (BIM) processes. By reinforcing these best practices, the team can maintain a consistent approach to model coordination, data exchange, and project documentation, leading to improved project outcomes and reduced risks.
+BIM Responsibilities and Scopes by Discipline
+This section will outline the scope of each BIM discipline to prevent overlaps and repetitions of model elements.
+Scope
+Disciple Responsible for Hosting
+In Coordination with
+Note
+Lighting
+ELEC
+INTR, ARCH
+Structural Concrete Walls
+STRC
+ARCH
+Slab Depth
+STRC
+ARCH
+Slab Edges (Slab)
+ARCH
+STRC
+ARCH will coordinate depth in drawings and filter out STRC model slabs
+Plumbing Fixtures
+MECH
+INTR, ARCH
+Custom wall finishes and Millwork
+INTR
+ARCH
+ARCH will model up to furring and partitions.
+Grading Model
+LAND
+CIVL, ARCH
+Common Data Environment
+ACC Hub Configuration
+For the purpose of the 118 Project Avenue , we will be using Autodesk Construction Cloud, Refer to Appendix E – ACC Set Up.
+Auto-publishing of models
+ACC models will be set to Auto-publish weekly on:
+be accessed, downloaded, or rolled back.
+Procedure for Saving and Archiving Models
+Issued milestones design files
+At all issued submission milestones, a copy of design files will be saved and work-shared into the 04-PUBLISHED folder space for reference. 
+MILESTONE/DELIVERABLE MODEL
+Milestone folder path:
+Milestone model naming convention
+Workshared Archives
+Should the need arise to create an archived design version of a file that needs to be workshared, the copy shall be placed under the 05-ARCHIVED folder. It is important not to keep archives under the 01-DESIGN folder space as it will appear on the Design Collaboration module. ACC maintains all deleted model and every week’s version of the model can. Geo-Referencing, Project Origin and North.
+Design Collaboration Module – Sharing and Consuming Packages
+Disciplines partaking in linking through the 02-SHARED folder are encouraged to share their model “package” often through the Design Collaboration during coordination periods. 
+COORDIANTION SHARING TIMELINE
+Package Sharing Timeline
+Minimum: Bi-Weekly
+Package Sharing Convention
+118 Project Avenue_Shared for XYZ 
+Examples: 118 Project Avenue_Shared for Coordination118 Project Avenue_Shared for IFT Progress
+Level of Development
+The Consultant’s Model Elements shall include, at a minimum, systems and components modeled to the Level of Development (LOD) required for specific project milestones. For the delivery of Construction Documents, deliverables by consultants are expected to meet:
+PROJECT LOD
+LOD 300
+ Information Exchange &amp; Scheduling
+Exchange/Collaboration Environment 
+Model Discipline
+Model Content
+Design Tool
+Storage Location
+Collaboration Frequency
+ARCH
+Architectural objects, code information
+Autodesk Revit 2024.2
+[Consultant Server Files loaded to FTP]
+Bi-Weekly and at Issuances
+STRC
+Structural steel members, bearing and shear walls, analytical structural model, lintels
+Autodesk Revit 2024.2
+[Consultant Server Files loaded to FTP]
+Bi-Weekly and at Issuances
+MECH
+Mechanical systems, Plumbing systems, equipment, load information
+Autodesk Revit 2024.2
+[Consultant Server Files loaded to FTP]
+Bi-Weekly and at Issuances
+ELEC
+Electrical Systems, equipment, load information
+Autodesk Revit 2024.2
+[Consultant Server Files loaded to FTP]
+Bi-Weekly and at Issuances
+ENRGY
+Energy data, run iterations, life cycle costing, peak loads
+Autodesk Revit 2024.2 / IES-Ve
+[Consultant Server Files loaded to FTP]
+Bi-Weekly and at Issuances
+File Discipline
+Model Content
+Design Tool
+Storage Location
+Collaboration Frequency
+CIVIL
+Topography, site utilities, hard and soft surfaces, other site objects
+Autodesk Civil 3D 2024
+[Consultant Server Files loaded to FTP]
+Bi-Weekly and at Issuances
+LAND
+Landscape design and landscaping elements.
+Autodesk AutoCAD 2024
+[Consultant Server Files loaded to FTP]
+At Issuances
+Collaboration Strategy 
+Copy/Monitor and Reference Chart
+The following chart illustrates how to use the information available in the models by the consultants, for both efficiency and better coordination. Here is a quick explanation of each column in the chart:
+Elements
+Primary Modeler
+Secondary Modeler / Duplicate Elements
+Location Dims
+Reference Type
+Visibility Control
+Levels/Grids
+ARCH
+-
+ARCH
+CM
+By Category
+Walls – Non-Structural
+ARCH
+-
+ARCH
+Ref
+By Category
+Structural Slabs - (Slab Edges, depressions)
+ARCH
+STRC
+ARCH
+CM
+By Category
+Structural Beams and Transfers
+STRC
+ARCH 
+ARCH
+CM
+By Category
+Structural Concrete
+STRC
+ARCH
+ARCH
+CM
+By Workset
+Structural Concrete - Curbs
+STRC
+ARCH
+ARCH
+CM
+By Workset
+Structural Steel
+STRC
+ARCH
+ARCH
+CM
+By Workset
+Structural Wood
+STRC
+ARCH
+ARCH
+CM
+By Workset
+Structural Masonry
+STRC
+ARCH
+ARCH
+CM
+By Workset
+Light Fixtures/Exit Signs
+ELEC
+ARCH
+ARCH
+Ref
+By Category
+Power and Systems - Receptacles, switches, etc.
+ELEC
+-
+ARCH
+Ref
+By Category
+Power and Systems - other
+ELEC
+-
+ARCH
+Ref
+By Category
+HVAC Diffusers / Grilles
+MECH
+ARCH
+ARCH
+CM
+By Category
+HVAC
+MECH
+-
+-
+Ref
+By Category
+Plumbing – Piping
+MECH
+-
+-
+Ref
+By Category
+Plumbing - Fixtures
+ARCH
+-
+ARCH
+CM
+By Workset
+Fire Protection – Sprinkler Heads
+MECH
+ARCH
+ARCH
+Ref
+By Category
+Fire Protection - Other
+MECH
+-
+ARCH
+Ref
+By Category
+Topography and Roads
+LAND/CIVIL
+ARCH
+Ref
+By Category
+Sidewalks
+LAND/CIVIL
+ARCH
+Ref
+By Category
+Parking
+ARCH
+-
+ARCH
+Ref
+By Category
+Interiors
+ARCH
+ARCH
+ARCH
+Ref
+By Category
+Primary Modeler: Is the discipline with primary responsibility for the performance and design of those elements.
+Secondary Modeler: Indicates model elements that are duplicated to facilitate coordination between discipline, communication of design intent, and location control.
+Reference Types: CM indicates elements that are expected to be Copy/Monitored. Ref indicated elements that should be referenced as required by all disciplines for coordination.
+Location Dimensions: Indicates the discipline responsible for providing location dimensions for the listed model elements.
+Visibility Control: Indicates how the visibility of model elements is controlled. Elements that are indicated “By Workset” need to be placed on a unique workset. Workset naming should be in accordance with the workset naming conventions in this document and agreed upon at the project kickoff meeting.
+Coordinate System and Acquiring coordinates
+All Revit files in the collaborative environment must have the same coordinate system.
+The Geocoordinate system will be: 
+Coordinates will be acquired from the following Revit model.
+Project Origin and Project North 
+The architectural consultant will define project origin to be followed by the design consultants. Although files are to be linked by shared coordinates (geo-located see B.7.1.), files should share the same internal origin location defined within the project area, especially for AutoCAD dwg files. 
+Project origin will be set to the following Revit ‘Internal Origin’:
+[Include below description and screenshot of known true reference (Gridline or Property Line corner):]
+Internal Origin
+Project North
+When building a Federated Model, it is required that all component models utilize the same geo-referencing as the Design Revit Models.
+left-91440000 
+-7315288912700Modelling Standards
+Model Nomenclature
+[Discipline]_[Project Short Form]_[Description]
+Example: 	ARCH_118 Project Avenue
+		SRCT_118 Project Avenue
+MODEL
+FILE NAME
+ARCHITECTURAL
+ ARCH_118 Project Avenue
+Shared Parameters
+Are there shared parameters?
+Linking Revit
+Revit models will be linked using the following settings
+Position
+Shared Coordinates
+Type
+Overlay
+Linking DWG
+DWG links in Revit will be managed through Revit DWG Container.  Refer to Appendix D
+Never IMPORT DWGs
+Worksets
+Worksets will be named thusly: 
+Taxonomy
+Example
+Discipline Designation_Company_Workset
+A_SVN_INTERIOR
+Workset discipline designator codes
+DISCIPLINE
+ACC DESIGNATION
+WORKSET DESIGNATION
+ARCHITECTURAL
+ARCH
+A
+CIVIL
+CIVIL
+C
+ELECTRICAL
+ELEC
+E
+INTERIOR DESIGN
+INTR
+I
+LANDSCAPE
+LAND
+L
+MECHANICAL
+MECH
+M
+SURVEY
+SRVY
+V
+STRUCTURAL
+STRC
+S
+TRANSPORTATION
+TRNS
+T
+URBAN DESIGN
+URBN
+U
+Architectural 
+WORKSET
+CONTENT
+A_SVN_SHARED LEVELS AND GRIDS
+Levels and Gridlines
+A_SVN_ENVELOPE
+Building envelope
+A_SVN_INTERIOR
+Interior partitions of the building
+A_SVN_CONTEXT
+Context building and landscape 
+A_SVN_CORE
+Elevator and stair cores
+A_SVN_SUITE
+Partitions and furniture within a housing suite
+A_SVN_FURNITURE
+Furniture and equipment not in contract
+A_SVN_STRUCTURE
+Structural columns, beams and floors drawn by SvN To be used through the project to coordinate with Structural consultant(s)  
+Close monitoring of the parity of both geometries must be performed
+A_SVN_LINKS
+Linked Revit model (i.e. A-LK-Mechanical)
+Structural
+WORKSET
+CONTENT
+S_[COMPANY]_[WORKSET]
+Mechanical
+WORKSET
+CONTENT
+M_[COMPANY]_[WORKSET]
+Electrical
+WORKSET
+CONTENT
+E_[COMPANY]_[WORKSET]
+Phasing
+Model elements are to be modeled in their proper phases. SvN Architects + Planners will be using the following phases in its models for this project:
+PHASE
+PURPOSE
+Existing
+Existing building
+Demolished
+Existing building elements to be demolished
+New Construction
+New Construction
+Render
+Future phase. For rendering purposes only.
+NOTE: All new views created for coordination purposes should have the phase filter set to New Construction.
+Levels
+All levels in consultant models should be Copy/Monitored from the following file:
+LEVELS C/M SOURCE
+Source of truth for Levels
+ARCH_118 Project Avenue
+These are levels that will be present in all models, with the same name and at the same elevation.
+LEVEL NAME (REVIT)
+DESCRIPTION
+ELEVATION (PROJECT)
+ELEVATION (SITE)
+Level 01
+T.O.S. Ground Floor
+92.00
+0.00
+These are levels that will be present in all models, with the same name and at the same elevation.
+LEVEL NAME (REVIT)
+DESCRIPTION
+ELEVATION (PROJECT)
+ELEVATION (SITE)
+[NAME]
+[ARCH]
+[X MM]
+[X MM]
+[Additional levels, used, but not common to all models, must be documented in this section (i.e. what are they hosting).]
+AUXILIARYLEVEL NAME (REVIT)
+DISCIPLINE
+PURPOSE
+ELEVATION (PROJECT)
+[NAME]
+[ARCH]
+[EXPLANATION]
+[X MM]
+Gridlines
+Gridlines can be Copy/Monitor from:
+GRIDLINE C/M SOURCE
+Source of truth for Gridlines
+ARCH_118 Project Avenue
+Matchlines
+Plan Matchlines can be obtained from:
+GRIDLINE C/M SOURCE
+Source of truth for Marchlines
+ARCH_118 Project Avenue
+Referring Linked View
+Jessica Place B1_Matchlines
+This will allow the consistent tiling of any ARCH D plans at 1:100.
+Project Units
+All project files are to use [Metric] units rounded to [1mm] by default. Any departures, due to reasons such as availability of building assemblies will be listed in this section.
+SOFTWARE
+UNITS
+PRECISION
+Revit
+mm
+1 mm
+AutoCAD
+mm or M
+1 mm or 100M
+Dimension Syles and Precision
+Dimensions will be in both metric (mm) and imperial (#‘-#”) 
+STYLE
+UNITS
+PRECISION
+SAMPLE
+[PRIMARY STYLE]
+mm
+5mm
+-1564199
+[ADDITIONAL STYLE]
+ft-in
+¼”
+Sheet Size
+Proposed Sheet Size for Architectural Drawings is ARCH D in Landscape format.
+Dimensions: 	610mm × 914mm   (24” x 36”)
+Drawing Scale
+For coordination with contractors, all disciplines should have a set of plans at 1:100 scale with coordinated match lines. (see section on Matchlines)
+Font
+Proposed standard font is Arial Narrow 2.0mm for Arch D (Half Size) 
+Documentation for Special Scenarios
+Strategies for Custom Workflows
+In the table below, establish agreed workflows to avoid commonly encountered issues during Design and Build phases. 
+ISSUE
+WORKFLOW
+Landscape designs in Rhino
+Millworker will submit drawing on this format and SvN will convert 
+End of Section
+left-91440000082359500Model Clash Detection
+Clash Detection Roles and Responsibilities
+If different from team in Book A enter here if not then: Refer to Book A, Section A.5
+Clash Detection Phase Schedule and Milestones
+Insert phase schedule and milestones
+Clash Detection Common Data Environment
+ACC HUB PROJECT
+Clash Detection CDE
+Autodesk Construction Cloud
+Name
+Insert name of Hub
+URL
+Insert URL of Hub
+For access requests please contact name@svn-ap.com\
+The clash detection phase will be conducted under a low-trust environment, meaning information needs to be shared through Design Collaboration Packages and Consumption of Packages for careful control of new information.
+Clash Detection Lead
+The process of clash detection will be led by the following firm
+NAME
+COMPANY
+Name
+Company
+Level of Development (LOD)
+All clash detection models should have achieved the following LOD prior to entering the environment
+CLASH DETECTION MINIMUM LOD
+LOD
+400
+Information Exchange and Scheduling
+WEEKLY PROGRESS SCHEDULING
+1. Models Auto-publish
+Friday at #:00
+2. INFO OUT 
+Shared Packages on Design Collaboration. May need to republish before Package Share
+Friday EOD
+3. INFO IN
+Consuming Shared Packages
+Monday at #:00
+4. Clash Report issued from ACC 
+Wednesday at #:00
+5. Team meeting to bring up coordination Issues 
+Thursday at #:00
+[repeat] 1. Models Auto-publish 
+[repeat]
+Revit Publish Settings for Collaboration
+The following views are necessary on all models for clash detection set up
+VIEW NAME
+ELEMENTS
+HOST MODEL
+Coordination View
+All models visible
+ACC Model Coordination Module - Set Up
+ACC Clash Spaces
+Clash spaces will be set up on the following folder:
+CLASH SPACES
+Folder
+02-SHARED
+ACC Clash Views
+Please use ACC view nomenclature to fill out table
+CLASH VIEW NAME
+VIEW 1 
+VIEW 2
+PURPOSE
+Model Name – View Name
+Model Name – View Name
+ACC Model Coordination - Issue Tracking
+Creating Issues
+FIELDS
+REQUIRED
+DESCRIPTION
+TITLE
+Model Name – View Name
+STATUS
+TYPE
+DESCRIPTION
+DUE DATE
+Preferred Assignees per team
+TEAM
+DESIGNATED ASSIGNEE
+PREFERRED WATCHERS
+ARCH
+Name
+Setting Status
+STATUS
+WHEN TO
+DRAFT
+Model Name – View Name
+OPEN
+PENDING
+IN-REVIEW
+CLOSED
+Only by ________ When issue deemed resolved
+Documentation for Special Scenarios
+Critical Tolerances
+ITEMS
+REASON / EXPLANATION
+[CATEGORY OR DESCRIPTIONI.E. STRUCTURAL REINFORCEMENT AND STRUCTURAL CONNECTIONS LIKE GUSSET PLATES, BASE PLATES]
+[i.e. Not modeled. Represented as Detail Components in views]
+Model Deviations
+For the Design phase modeling tolerances are understood to be reflective of design intent.  Deviations should be noted below.
+ITEMS
+NOT ACCURATE FOR
+REASON / EXPLANATION
+[CATEGORY OR DESCRIPTIONI.E. STRUCTURAL REINFORCEMENT AND STRUCTURAL CONNECTIONS LIKE GUSSET PLATES, BASE PLATES]
+[i.e. Clash Detection, Count, Estimating]
+[i.e. Not modeled. Represented as Detail Components in views]
+[IMPERIAL ELEMENTS]
+Strategies for Custom Workflows
+In the table below, establish agreed workflows to avoid commonly encountered issues during Design and Build phases. 
+ISSUE
+WORKFLOW
+MILLWORKER WORKS IN RHINO
+Millworker will submit drawing on this format and SvN will convert 
+End of Section
+-190831-94620500
+left841182005377014716429100Appendices
+Glossary
+Construction Model
+An aggregated model (Revit or non-Revit), managed by the Construction Manager / General Contractor, comprised of multiple design, contractor and trade fabrication models as required to enable the generation of a virtual coordination environment during construction.
+Design Model
+Individual models (Revit) that are created and maintained exclusively by members of the design team.  These models are kept current throughout construction incorporating all construction changes issued through the Owner’s standard format for documenting changes to the work.
+Fabrication Model
+Highly detailed model generated by a trade (non-Revit) to enable prefabrication and detailed virtual coordination prior to construction. For example, while a ‘Design Model’ for HVAC ductwork will include duct sizes at various elevations, the ‘Fabrication Model’ will additionally include necessary weld gaps, hangers and design tolerances for its fabrication.
+Federated Model
+A single model (non-Revit) that is comprised of multiple models from various sources whose identity or integrity cannot be modified through changes made to other models. Normally, a federated model is used to bring together ‘Design Model’, ‘Site Model’ and ‘Fabrication Models’ into a single environment for the purpose of virtual coordination during Design and Build phases.
+Record Model
+Final updated ‘Design Models’ (Revit), including changes required by the project ‘Accuracy Table’ to reflect the agreed as constructed condition. Models contain views, rooms, sheets and schedules used to generate 2D construction documents.
+Virtual Coordination
+Refers to both the Digital Building Review Process (manual) and the Clash Review Process (semi-automated) to ensure design is properly resolved.
+Design Models
+ (Schematic Design, Design Development, AHJ Submissions, Contract Documents)
+The Design Models as well as an accompanying PDF are to be made available for the client’s analysis and audit. The model will be uploaded and submitted to the FTP platform at the specific intervals and project milestones detailed above.  The model is to be fully coordinated with all major disciplines to the LOD identified for each phase as defined in this document. 
+The model is to be used as an analytical tool to investigate architectural solutions while exploring elements of the design. It should assist in the functional program development and validate with regards to space distribution and functionality. It should facilitate investigations of building and energy performance while providing the process for building systems integration. 
+The BIM model should assist the team with sustainable and green strategies. Materials and methods analysis should be an integral process and incorporated into the model. 
+Tender Model(s)
+The Tender Model(s) will be submitted to the Client via upload to the FTP site. The models will then be made available by the Client to the General Contractor and bidding team for reference. The team will not provide a tender model for an open bid process. Crozier’s Tender models can be provided to awarded GC/Contractors with a signed digital document release form.
+NOTE: The Tender Model may be amended by the owner during the bid process via addenda.
+Issued for Construction Model
+The IFC BIM (Issued for Construction) Model represents the final Design Model and the final model issuance from the consultant team (Architect, Structural, MEP). It will be a Revit file compiled and prepared by the Consultant team. It will be provided to the Client and Construction Manager for reference alongside the Issued for Construction contract documents. The Revit IFC Model will be a non-editable, reference model only fit for adapted use by the Construction Manager. 
+Contract Admin Model
+The consultant team will continue to use the IFC model and adapt for their uses during construction to respond to RFIs, Site Instructions and Change Orders. This model will serve as an internal tool and will not be shared with the contractor or kept up to date with as-built conditions on site. After the IFC model is issued, the GC will take responsibility for updating the construction model as coordination with the trades progresses.
+As Built Model
+The As-Built Model will be a BIM file compiled and prepared by the Construction Manager. The details of the As-Built Model will be determined and agreed between the Construction Manager and the Client.
+Workset
+The collaborative nature of BIM dictates a need for simultaneous access to the Revit model by multiple users. Revit accomplishes this through its Worksharing functionality, a capability that allows users to gain exclusive access to sets of objects at a time, without the need to lock out access to the whole file.
+Worksets are expected to be used for organizing workflow and the logical division of scope by discipline. Each linked Revit model should be hosted on a separate workset. This approach significantly assists in improving Revit Model(s) access performance and visibility control. 
+The use of worksets should be minimized and used with the intent of controlling visibility and permissions when required. Any content not relevant to other parties should be kept on its own workset, clearly identified as being for internal use. The strategy for the guidelines is to provide a prefix and a means of communicating the intention of the workset.
+Abbreviations
+Abbreviation
+Definitions
+LOD
+Level
+Name
+Description
+Typical Project Phase
+LOD 100
+Conceptual
+The model element is represented by a symbol or generic massing. No specific dimensions or locations are yet defined. Used for basic spatial studies and area calculations.
+Pre-Design / Feasibility
+LOD 200
+Schematic
+The element is a generic placeholder. It has approximate quantities, size, shape, and location. It is "recognizable" (e.g., you can tell it’s a wall or a window) but still not specific.
+Schematic Design
+LOD 300
+Detailed
+The element is represented as a specific system, object, or assembly with accurate dimensions, shape, location, and orientation. This is the baseline for construction documentation.
+Design Development
+LOD 350
+Construction
+Includes interfaces and connections with other building systems (e.g., how a wall attaches to a slab). Crucial for clash detection and interdisciplinary coordination.
+Construction Documentation
+LOD 400
+Fabrication
+The model is detailed enough for manufacturing and shop drawings. Includes precise fabrication info, fasteners, and assembly instructions.
+Fabrication / Construction
+LOD 500
+As-Built
+The model has been field-verified. It reflects the actual installed conditions, including final positions and maintenance data. Used for facility management.
+Post-Construction / FM
+Syncing, Publishing, Sharing, Consuming in ACC
+Autodesk Construction Cloud Docs Module
+This section refers to specific collaboration method on the Autodesk Construction Cloud as set up by SvN Architects+Planners. 
+Autodesk Docs is a cloud-based common data environment that provides document management and control to the entire project team. With Autodesk Docs, AEC teams can simplify collaboration and data management from design to construction and streamline document review and approval workflows.
+ACC Docs hub has been configured in the following breakdown.
+MAIN FOLDER
+DESCRIPTION
+00-RESOURCES
+Shared folder for any multidiscipline BIM material, including this BIM Execution Plan.
+01-DESIGN
+WIP space for drawing production. Each discipline has its own workspace with protected write privileges.
+02-SHARED
+The Shared folder is populated automatically by “sharing packages” through the ACC Design Collaboration module.  From the Design Collaboration module, teams can also “consume” packages to automatically bring package documents into their 01-Design workspace under the “Consumed” folder for linking and references. 
+03-PUBLISHED
+Published folder will serve as a record of milestone submissions for all disciplines. The subfolders within will not be structured by disciplines, but rather by milestones
+04-ARCHIVED
+Archived folder will contain any necessary archived models that may need to remain accessible to the team. It is important not to keep archived models within the 01-DESIGN folder as these will appear in the Design Collaboration module.
+This is an example of the workflow of documents between ACC Docs folders
+Uploading a Revit file
+In order to upload a Revit file into ACC for collaboration, the file needs to be brought into ACC from within the Revit interface, through the Collaborate tab, Collaborate in Cloud. The model should be placed in the 01-Design folder path, under the appropriate discipline. 
+Sharing Process
+The following section provides an example workflow for sharing files among other task teams and parties. 
+Sharing files is a two-way communication. Files must be shared by the originating team and consumed by the other teams to be included in their workflow. This is typically referred to as a "Low-trust environment", or controlled sharing. This ensures that teams receive information as appropriate to their workflow. Systematically, this results in files being copied from 02-Shared into a "Consumed" folder for each team, as depicted below:
+Publishing Models
+Publishing a model on ACC archives a version of a model on the hub.
+The ACC hub has been configured to auto-publish Revit models every Friday at 22:00 EST. Publishing can also be done by any user prior to sharing or when a specific milestone has been reached. Publishing a model must be done through the Revit Home interface. 
+4.6 Published Views and Sheets in the Model
+ACC allows certain views to be viewed at a glance on the web interface. These views need to be selected within the Revit File from the Collaborate Tab &gt; Publish Settings.
+All Revit models should have selected the following views as Publish:
+	View Type	View Name	Description
+1	3D View	3D_Coordination 	Only local geometries. No Links
+2	3D View	3D_Coordination_Links	View with any relevant links loaded
+3	Sheets	(Sheet Names)	Any sheet that is part of the set
+Sharing Models
+Co-ordination meetings will happen in a bi-weekly schedule unless more co-ordination is required as the project advances. Models will be shared during the in-between week to allow all disciplines to review, make changes and track comments to be presented at the next coordination meeting.
+ Once a model has been published it can be shared in the design collaboration module. 
+ From the Design Collaboration module, the timeline can be expanded (•••) to see all packages shared by each discipline. A package can be started by selecting the (+ Create Package) 
+Standard naming of packages is “Bristol Tower 1 - Package Purpose.”
+Example:	Bristol Tower 1 - Shared for Costing  
+Consuming Models
+Through the Design Collaboration module, one can review models issued by other disciplines and “consume” them, meaning, they will be automatically copied into your respective DESIGN folder under the Docs ACC module, under the folder “consumed.”
+When browsing through the Design Collaboration timeline, a filled bubble means the package has already been consumed by your team. A hollow bubble means the package has not been consumed by your team. A dashed bubble is a draft package by your team.
+Once the empty bubble is “Consumed” the shared file will be copied into the proper discipline (In this case, ARCH) into the consumed folder for the team to reference. 
+DWG Container Files
+Why use a Container?
+Using a geolocated dwg container file is the best way to keep your project model lean, ensure a linked DWG does not show up on other views, keep you dwg truly geolocated, avoid most graphic glitches, and create a single file to manage multiple dwg's from a single consulting discipline. 
+A project specific geolocated container can be found in ACC 00-RESOURCES
+Linking DWG to a geolocated blank:
+First make a copy of the geolocated blank so you create a disciplne specific container. You can do this by saving the blank to your desktop first, then under the Collaborate Tab, "Collaborate to Cloud" that blank into the approate disciple folders in your projects ACC.
+Go to the set up Container Vew and change its name to reflect DWG origin or disciipline and its tile. 
+One DWG Container may contain multiple DWG's within, all dwg's willl be controlled via view parameters.
+Load your projects Revit link, (or link in your project via shared coordaintes) and under Visibility/Graphics&gt;Links, set the visibility "By View" and choose a clean view that shows all required reference geometries, i.e. Property Line, Ground floor envelope, Roof outline, etc.
+Link a DWG to this Revit. Ensure you select the following settings.
+a) Current view only (YES)b) Colors (Monochrome)c) Layers/Level (All)d) Import Units (Auto-Detect)e) Correct Lines.. (NO)f) Positioning: (Manual - Origin)e) Place at: (Level 01)h) Oriante to View (NO)6. Once you place the DWG, move it, carefully aligining it using the linked project references.7. Pin the DWG!8. In the view slect the DWG and thing if you want this dwg to appear as a foreground or background object. If you need both for diferent views, simply, "Copy View with Detailing" and make two views, one with dwg as foreground, one with dwg as background. Ensure the view name is clear.
+Loading the DWG Container to your model:
+Link the DWG Container to your project file in the appropriate workset, because all the dwg's should be set to "Current View Only" you will not see anything right away.
+In the view where you need the DWG, under Visibility/Graphics change the visibility of the DWG Container to "By Linked View" and select the view you've created.

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="BEPDesigner.WinUI.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:BEPDesigner.WinUI">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <Color x:Key="BepAccentA">#FF1C9E77</Color>
+            <Color x:Key="BepAccentB">#FFE2711D</Color>
+            <Color x:Key="BepCard">#FF171A22</Color>
+            <Color x:Key="BepPanel">#FF11141C</Color>
+
+            <SolidColorBrush x:Key="BepCardBrush" Color="{StaticResource BepCard}" />
+            <SolidColorBrush x:Key="BepPanelBrush" Color="{StaticResource BepPanel}" />
+            <SolidColorBrush x:Key="BepAccentABrush" Color="{StaticResource BepAccentA}" />
+            <SolidColorBrush x:Key="BepAccentBBrush" Color="{StaticResource BepAccentB}" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -32,6 +32,19 @@ ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
 ENV_CLIENT_ID_KEY = "CLIENT_ID"
 ENV_CLIENT_SECRET_KEY = "CLIENT_SECRET"
 
+EXCEL_ATTRIBUTE_ALIASES = {
+    "description": "description",
+    "desc": "description",
+    "item description": "item_description",
+    "item_description": "item_description",
+    "file description": "item_description",
+    "file_description": "item_description",
+    "display name": "display_name",
+    "displayname": "display_name",
+    "item name": "display_name",
+    "item_name": "display_name",
+}
+
 
 def _load_env_file(path):
     data = {}
@@ -131,9 +144,10 @@ def coerce_to_2d(values):
 
 
 class ExcelRow(object):
-    def __init__(self, file_name="", description=""):
+    def __init__(self, file_name="", description="", attributes=None):
         self.FileName = file_name
         self.Description = description
+        self.Attributes = attributes or {}
 
 
 class ExcelReader(object):
@@ -370,34 +384,59 @@ class ExcelReader(object):
                 header = ExcelReader._normalize_name(header_val)
                 if not header:
                     continue
-                headers[header] = (col - col_start) + 1
+                headers[header] = col
             try:
                 diag["headers"] = [h for h in headers.keys()]
             except Exception:
                 diag["headers"] = []
 
-            # Always read descriptions from Column B (row 2+),
-            # per user request, regardless of header text.
-            description_index = col_start + 1 if (col_start + 1) <= col_end else -1
+            file_col = None
+            for key in ("file", "file name", "filename", "file_name"):
+                if key in headers:
+                    file_col = headers.get(key)
+                    break
+            if file_col is None:
+                file_col = col_start
+
+            description_index = headers.get("description")
+            if description_index is None:
+                description_index = col_start + 1 if (col_start + 1) <= col_end else -1
+            diag["file_col"] = file_col
             diag["description_index"] = description_index
 
             for row in range(row_start + 1, row_end + 1):
-                file_val = safe_get(row, col_start)
+                file_val = safe_get(row, file_col)
                 if file_val is None or not str(file_val).strip():
-                    file_val = safe_get_text(row, col_start)
+                    file_val = safe_get_text(row, file_col)
                 if file_val is None:
                     continue
                 file_name = str(file_val).strip()
                 if not file_name:
                     continue
 
-                description = ""
-                if description_index >= col_start and description_index <= col_end:
+                attributes = {}
+                for header, col in headers.items():
+                    if col == file_col:
+                        continue
+                    val = safe_get(row, col)
+                    if val is None or (isinstance(val, str) and not val.strip()):
+                        val = safe_get_text(row, col)
+                    if val is None:
+                        continue
+                    text_val = str(val).strip()
+                    if not text_val:
+                        continue
+                    attributes[header] = text_val
+
+                description = attributes.get("description", "")
+                if not description and description_index >= col_start and description_index <= col_end:
                     desc_val = safe_get(row, description_index)
                     if desc_val is None or (isinstance(desc_val, str) and not desc_val.strip()):
                         desc_val = safe_get_text(row, description_index)
                     if desc_val is not None:
                         description = str(desc_val).strip()
+                        if description:
+                            attributes.setdefault("description", description)
 
                 try:
                     if len(diag["samples"]) < 5:
@@ -405,7 +444,7 @@ class ExcelReader(object):
                 except Exception:
                     pass
 
-                row_obj = ExcelRow(file_name, description)
+                row_obj = ExcelRow(file_name, description, attributes)
                 ExcelReader._add_result(result, ExcelReader._normalize_name(file_name), row_obj)
                 ExcelReader._add_result(result, ExcelReader._normalize_base(file_name), row_obj)
                 diag["rows_read"] = diag["rows_read"] + 1
@@ -668,6 +707,40 @@ class AccDataClient(object):
             pass
         http_send("PATCH", url, body, "application/vnd.api+json", headers)
 
+    def update_item_display_name(self, project_id, item_id, display_name):
+        self._ensure_token()
+        url = "https://developer.api.autodesk.com/data/v1/projects/{0}/items/{1}".format(
+            Uri.EscapeDataString(project_id),
+            Uri.EscapeDataString(item_id),
+        )
+
+        body = json.dumps({
+            "jsonapi": {"version": "1.0"},
+            "data": {
+                "type": "items",
+                "id": item_id,
+                "attributes": {
+                    "displayName": display_name,
+                },
+            },
+        })
+
+        headers = {"Authorization": "Bearer " + self._session.AccessToken}
+        try:
+            name_preview = display_name if display_name is not None else ""
+            if len(name_preview) > 120:
+                name_preview = name_preview[:117] + "..."
+            self._log("PATCH item displayName: item_id={0} name_len={1} name='{2}'".format(
+                item_id,
+                len(display_name or ""),
+                name_preview,
+            ))
+            self._log("PATCH url: {0}".format(url))
+            self._log("PATCH body: {0}".format(body))
+        except Exception:
+            pass
+        http_send("PATCH", url, body, "application/vnd.api+json", headers)
+
     def update_version_description(self, project_id, version_id, description):
         self._ensure_token()
         url = "https://developer.api.autodesk.com/data/v1/projects/{0}/versions/{1}".format(
@@ -681,7 +754,11 @@ class AccDataClient(object):
                 "type": "versions",
                 "id": version_id,
                 "attributes": {
-                    "description": description,
+                    "extension": {
+                        "data": {
+                            "description": description,
+                        }
+                    }
                 },
             },
         })
@@ -701,6 +778,47 @@ class AccDataClient(object):
         except Exception:
             pass
         http_send("PATCH", url, body, "application/vnd.api+json", headers)
+
+    @staticmethod
+    def _normalize_bim360_project_id(project_id):
+        if not project_id:
+            return project_id
+        pid = project_id.strip()
+        if pid.startswith("b.") or pid.startswith("a."):
+            return pid[2:]
+        return pid
+
+    def get_custom_attribute_definitions(self, project_id, folder_id):
+        self._ensure_token()
+        pid = AccDataClient._normalize_bim360_project_id(project_id)
+        url = "https://developer.api.autodesk.com/bim360/docs/v1/projects/{0}/folders/{1}/custom-attribute-definitions".format(
+            Uri.EscapeDataString(pid),
+            Uri.EscapeDataString(folder_id),
+        )
+        headers = {"Authorization": "Bearer " + self._session.AccessToken}
+        return http_send("GET", url, None, "application/json", headers)
+
+    def update_version_custom_attributes(self, project_id, version_id, attributes):
+        if not attributes:
+            return
+        self._ensure_token()
+        pid = AccDataClient._normalize_bim360_project_id(project_id)
+        url = "https://developer.api.autodesk.com/bim360/docs/v1/projects/{0}/versions/{1}/custom-attributes:batch-update".format(
+            Uri.EscapeDataString(pid),
+            Uri.EscapeDataString(version_id),
+        )
+        body = json.dumps(attributes)
+        headers = {"Authorization": "Bearer " + self._session.AccessToken}
+        try:
+            self._log("POST custom attributes: version_id={0} attrs={1}".format(
+                version_id,
+                len(attributes),
+            ))
+            self._log("POST url: {0}".format(url))
+            self._log("POST body: {0}".format(body))
+        except Exception:
+            pass
+        http_send("POST", url, body, "application/json", headers)
 
     def _get(self, url):
         self._ensure_token()
@@ -839,6 +957,9 @@ class AccDocsWindow(object):
         self._excel_rows = None
         self._auth_in_progress = False
         self._last_selected_folder_id = None
+        self._active_folder_id = None
+        self._custom_attr_defs = None
+        self._custom_attr_defs_folder_id = None
         self._config = pyrevit_script.get_config()
 
         self.login_button.Click += self.on_sign_in
@@ -1010,11 +1131,12 @@ class AccDocsWindow(object):
         if not diag:
             return
         try:
-            self.log("Excel diagnostics: range R{0}-R{1}, C{2}-C{3}, desc_col={4}, rows={5}".format(
+            self.log("Excel diagnostics: range R{0}-R{1}, C{2}-C{3}, file_col={4}, desc_col={5}, rows={6}".format(
                 diag.get("row_start"),
                 diag.get("row_end"),
                 diag.get("col_start"),
                 diag.get("col_end"),
+                diag.get("file_col"),
                 diag.get("description_index"),
                 diag.get("rows_read"),
             ))
@@ -1036,24 +1158,56 @@ class AccDocsWindow(object):
                 self.log("Excel headers (row 1): {0}".format(", ".join(headers)))
         except Exception:
             pass
+
+    def _get_active_folder_id(self):
         try:
-            samples = diag.get("samples") or []
-            for idx, sample in enumerate(samples):
-                file_val = sample[0] if len(sample) > 0 else ""
-                desc_val = sample[1] if len(sample) > 1 else ""
-                self.log("Excel sample {0}: file='{1}' desc='{2}'".format(idx + 1, file_val, desc_val))
+            node = self.folder_tree.SelectedItem
         except Exception:
-            pass
+            node = None
+        if node is not None and not getattr(node, "IsUpLevel", False) and getattr(node, "Id", None):
+            return node.Id
+        if self._active_folder_id:
+            return self._active_folder_id
+        return None
+
+    def _get_custom_attribute_definitions(self, project_id, folder_id):
+        if not folder_id:
+            return {}
+        if self._custom_attr_defs_folder_id == folder_id and self._custom_attr_defs is not None:
+            return self._custom_attr_defs
+
+        defs_map = {}
         try:
-            rows = diag.get("rows") or []
-            if rows:
-                self.log("Excel rows (A,B): showing up to {0}".format(len(rows)))
-            for idx, row in enumerate(rows):
-                file_val = row[0] if len(row) > 0 else ""
-                desc_val = row[1] if len(row) > 1 else ""
-                self.log("Excel row {0}: file='{1}' desc='{2}'".format(idx + 1, file_val, desc_val))
-        except Exception:
-            pass
+            json_text = self._data_client.get_custom_attribute_definitions(project_id, folder_id)
+            root = json.loads(json_text) if json_text else {}
+            if isinstance(root, list):
+                defs = root
+            elif isinstance(root, dict):
+                defs = root.get("data") or root.get("results") or root.get("customAttributes") or []
+            else:
+                defs = []
+
+            for item in defs:
+                if not isinstance(item, dict):
+                    continue
+                name = item.get("name") or item.get("displayName") or ""
+                if not name:
+                    continue
+                key = ExcelReader._normalize_name(name)
+                if not key:
+                    continue
+                defs_map[key] = {
+                    "id": item.get("id"),
+                    "name": name,
+                    "type": item.get("type"),
+                }
+        except Exception as ex:
+            self.log("Failed to load custom attribute definitions: {0}".format(ex))
+            defs_map = {}
+
+        self._custom_attr_defs = defs_map
+        self._custom_attr_defs_folder_id = folder_id
+        return defs_map
 
     def on_sign_in(self, sender, args):
         client_id = (self.client_id_box.Text or "").strip()
@@ -1348,6 +1502,7 @@ class AccDocsWindow(object):
 
     def _load_files_for_folder(self, project_id, node):
         try:
+            self._active_folder_id = node.Id
             self.status_text.Text = "Loading files..."
             self._file_items.Clear()
             files = self._data_client.get_files_in_folder(project_id, node.Id)
@@ -1382,6 +1537,8 @@ class AccDocsWindow(object):
         if not candidates:
             MessageBox.Show("Project ID not found in URL. Select a project from the list and try again.", TITLE, MessageBoxButton.OK, MessageBoxImage.Warning)
             return
+
+        self._active_folder_id = folder_id
 
         try:
             self._config.last_folder_url = url
@@ -1494,64 +1651,144 @@ class AccDocsWindow(object):
                 self.log("Skipped (no Excel row): {0} | key='{1}' base='{2}'".format(item_label, row_key, row_key_base))
                 continue
 
-            if not row.Description:
+            row_attrs = row.Attributes or {}
+            if (not row_attrs) and row.Description:
+                row_attrs = {"description": row.Description}
+
+            normalized_attrs = {}
+            custom_attr_values = {}
+            for key, value in row_attrs.items():
+                norm_key = ExcelReader._normalize_name(key)
+                text_val = "" if value is None else str(value).strip()
+                if not text_val:
+                    continue
+                alias = EXCEL_ATTRIBUTE_ALIASES.get(norm_key)
+                if alias:
+                    if alias not in normalized_attrs:
+                        normalized_attrs[alias] = text_val
+                else:
+                    if norm_key and norm_key not in custom_attr_values:
+                        custom_attr_values[norm_key] = text_val
+
+            if not normalized_attrs and not custom_attr_values:
                 skipped += 1
-                self.log("Skipped (empty description): {0} | excel='{1}'".format(item_label, row.FileName))
+                self.log("Skipped (no supported attributes): {0} | excel='{1}'".format(item_label, row.FileName))
                 continue
 
             try:
                 try:
-                    desc_preview = row.Description if row.Description is not None else ""
-                    if len(desc_preview) > 120:
-                        desc_preview = desc_preview[:117] + "..."
-                    self.log("Updating: {0} | type={1} | item_id={2} | desc_len={3} | desc='{4}'".format(
+                    preview_bits = []
+                    if "description" in normalized_attrs:
+                        desc_preview = normalized_attrs["description"]
+                        if len(desc_preview) > 80:
+                            desc_preview = desc_preview[:77] + "..."
+                        preview_bits.append("desc='{0}'".format(desc_preview))
+                    if "display_name" in normalized_attrs:
+                        name_preview = normalized_attrs["display_name"]
+                        if len(name_preview) > 80:
+                            name_preview = name_preview[:77] + "..."
+                        preview_bits.append("display='{0}'".format(name_preview))
+                    if "item_description" in normalized_attrs:
+                        item_desc_preview = normalized_attrs["item_description"]
+                        if len(item_desc_preview) > 80:
+                            item_desc_preview = item_desc_preview[:77] + "..."
+                        preview_bits.append("item_desc='{0}'".format(item_desc_preview))
+                    self.log("Updating: {0} | type={1} | item_id={2} | {3}".format(
                         file_item.DisplayName,
                         file_item.ExtensionType,
                         file_item.Id,
-                        len(row.Description or ""),
-                        desc_preview,
+                        ", ".join(preview_bits),
                     ))
                 except Exception:
                     pass
-                try:
-                    item_json = self._data_client.get_item_detail(project.Id, file_item.Id)
-                    item_root = json.loads(item_json) if item_json else {}
-                    item_data = item_root.get("data", {}) if isinstance(item_root, dict) else {}
-                    item_attrs = item_data.get("attributes", {}) if isinstance(item_data, dict) else {}
-                    ext = item_attrs.get("extension", {}) if isinstance(item_attrs, dict) else {}
-                    ext_type = ext.get("type", "")
-                    ext_data = ext.get("data", {}) if isinstance(ext, dict) else {}
-                    current_desc = ext_data.get("description", "")
-                    tip = None
+
+                tip = None
+                need_item_detail = ("description" in normalized_attrs) or bool(custom_attr_values)
+                if need_item_detail:
                     try:
-                        rel = item_data.get("relationships", {}) if isinstance(item_data, dict) else {}
-                        tip_rel = rel.get("tip", {}) if isinstance(rel, dict) else {}
-                        tip_data = tip_rel.get("data", {}) if isinstance(tip_rel, dict) else {}
-                        tip = tip_data.get("id", None)
-                    except Exception:
+                        item_json = self._data_client.get_item_detail(project.Id, file_item.Id)
+                        item_root = json.loads(item_json) if item_json else {}
+                        item_data = item_root.get("data", {}) if isinstance(item_root, dict) else {}
+                        item_attrs = item_data.get("attributes", {}) if isinstance(item_data, dict) else {}
+                        ext = item_attrs.get("extension", {}) if isinstance(item_attrs, dict) else {}
+                        ext_type = ext.get("type", "")
+                        ext_data = ext.get("data", {}) if isinstance(ext, dict) else {}
+                        current_desc = ext_data.get("description", "")
+                        try:
+                            rel = item_data.get("relationships", {}) if isinstance(item_data, dict) else {}
+                            tip_rel = rel.get("tip", {}) if isinstance(rel, dict) else {}
+                            tip_data = tip_rel.get("data", {}) if isinstance(tip_rel, dict) else {}
+                            tip = tip_data.get("id", None)
+                        except Exception:
+                            tip = None
+                        self.log("Pre-update item: ext_type='{0}' desc='{1}' tip='{2}'".format(ext_type, current_desc, tip or ""))
+                    except Exception as ex:
+                        self.log("Pre-update fetch failed: {0}".format(ex))
                         tip = None
-                    self.log("Pre-update item: ext_type='{0}' desc='{1}' tip='{2}'".format(ext_type, current_desc, tip or ""))
-                except Exception as ex:
-                    self.log("Pre-update fetch failed: {0}".format(ex))
-                    item_data = {}
-                    tip = None
 
-                if file_item.ExtensionType == "items:autodesk.bim360:C4RModel":
-                    skipped += 1
-                    self.log("Skipped (C4RModel not supported for description update): {0}".format(item_label))
-                    continue
+                if "description" in normalized_attrs:
+                    if file_item.ExtensionType == "items:autodesk.bim360:C4RModel":
+                        self.log("Skipped description (C4RModel not supported): {0}".format(item_label))
+                        normalized_attrs.pop("description", None)
+                    elif not tip:
+                        self.log("Skipped description (missing tip version id): {0}".format(item_label))
+                        normalized_attrs.pop("description", None)
+                    elif file_item.ExtensionType and file_item.ExtensionType.startswith("items:autodesk.bim360"):
+                        # BIM360 PATCH /versions does not support description; use PATCH /items instead
+                        if "item_description" not in normalized_attrs:
+                            normalized_attrs["item_description"] = normalized_attrs.pop("description")
+                        else:
+                            normalized_attrs.pop("description", None)
 
-                effective_ext_type = ext_type if ext_type else file_item.ExtensionType
-                if effective_ext_type == "items:autodesk.bim360:File":
-                    self._data_client.update_file_description(project.Id, file_item.Id, row.Description)
+                applied = 0
+                if "description" in normalized_attrs and tip:
+                    self._data_client.update_version_description(project.Id, tip, normalized_attrs["description"])
+                    file_item.Description = normalized_attrs["description"]
+                    applied += 1
+
+                if "item_description" in normalized_attrs:
+                    self._data_client.update_file_description(project.Id, file_item.Id, normalized_attrs["item_description"])
+                    file_item.Description = normalized_attrs["item_description"]
+                    applied += 1
+
+                if "display_name" in normalized_attrs:
+                    self._data_client.update_item_display_name(project.Id, file_item.Id, normalized_attrs["display_name"])
+                    file_item.DisplayName = normalized_attrs["display_name"]
+                    applied += 1
+
+                if custom_attr_values:
+                    if not tip:
+                        self.log("Skipped custom attributes (missing tip version id): {0}".format(item_label))
+                    else:
+                        folder_id = self._get_active_folder_id()
+                        defs_map = self._get_custom_attribute_definitions(project.Id, folder_id)
+                        attrs_payload = []
+                        missing_defs = []
+                        for key, value in custom_attr_values.items():
+                            definition = defs_map.get(key)
+                            if not definition or not definition.get("id"):
+                                missing_defs.append(key)
+                                continue
+                            attrs_payload.append({
+                                "id": definition.get("id"),
+                                "value": value,
+                            })
+                        if missing_defs:
+                            self.log("Custom attributes not found in folder definitions: {0}".format(", ".join(missing_defs)))
+                        if attrs_payload:
+                            self._data_client.update_version_custom_attributes(project.Id, tip, attrs_payload)
+                            applied += len(attrs_payload)
+
+                if applied:
+                    updated += applied
+                    self.log("Updated: {0} ({1} attribute{2})".format(
+                        item_label,
+                        applied,
+                        "" if applied == 1 else "s",
+                    ))
                 else:
                     skipped += 1
-                    self.log("Skipped (extension type not supported for description update): {0}".format(item_label))
-                    continue
-
-                file_item.Description = row.Description
-                updated += 1
-                self.log("Updated: {0}".format(item_label))
+                    self.log("Skipped (no applicable updates): {0}".format(item_label))
             except Exception as ex:
                 self.log("Failed to update {0}: {1}".format(item_label, ex))
 

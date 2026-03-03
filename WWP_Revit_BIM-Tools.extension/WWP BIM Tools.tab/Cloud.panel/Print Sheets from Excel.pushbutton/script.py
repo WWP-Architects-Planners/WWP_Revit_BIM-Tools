@@ -24,12 +24,15 @@ to remain.
 import re
 import os.path as op
 import codecs
+import csv
+import unicodedata
 import os, datetime, locale
 from collections import namedtuple
 
-from System import DateTime, Type, Activator, Array, Object
+from System import DateTime, Type, Activator, Array, Object, TimeSpan
 from System.Runtime.InteropServices import Marshal
 from System.Reflection import BindingFlags
+from System.Threading import Thread
 
 from pyrevit import HOST_APP
 from pyrevit import framework
@@ -40,6 +43,12 @@ from pyrevit import forms
 from pyrevit import revit, DB
 from pyrevit import script
 from pyrevit.compat import get_elementid_value_func
+
+try:
+    from Microsoft.Win32 import OpenFileDialog, SaveFileDialog
+except Exception:
+    OpenFileDialog = Forms.OpenFileDialog
+    SaveFileDialog = Forms.SaveFileDialog
 
 
 get_elementid_value = get_elementid_value_func()
@@ -57,10 +66,56 @@ def coerce_to_2d(values):
     if values is None:
         return None
     if hasattr(values, 'GetLowerBound'):
-        return values
+        try:
+            # Already a 2D System.Array
+            values.GetLowerBound(1)
+            return values
+        except Exception:
+            # Excel can return a 1D array for degenerate ranges.
+            # Normalize to a single-row 2D array.
+            try:
+                lb0 = values.GetLowerBound(0)
+                ub0 = values.GetUpperBound(0)
+            except Exception:
+                arr = Array.CreateInstance(Object, 1, 1)
+                arr[0, 0] = values
+                return arr
+            length = (ub0 - lb0) + 1
+            if length < 1:
+                return None
+            arr = Array.CreateInstance(Object, 1, length)
+            for idx in range(lb0, ub0 + 1):
+                arr[0, idx - lb0] = values[idx]
+            return arr
     arr = Array.CreateInstance(Object, 1, 1)
     arr[0, 0] = values
     return arr
+
+
+def normalize_match_text(value):
+    if value is None:
+        return ''
+    try:
+        if isinstance(value, unicode):
+            text = value
+        elif isinstance(value, str):
+            try:
+                text = value.decode('utf-8')
+            except Exception:
+                text = value.decode('cp1252', 'ignore')
+        else:
+            text = unicode(value)
+    except Exception:
+        try:
+            text = str(value)
+        except Exception:
+            text = ''
+    text = text.strip().lstrip(u'\ufeff')
+    try:
+        text = unicodedata.normalize('NFC', text)
+    except Exception:
+        pass
+    return text
 
 
 EXPORT_ENCODING = 'utf_16_le'
@@ -152,6 +207,14 @@ class ComInterop(object):
     FLAGS = BindingFlags.Public | BindingFlags.Instance | BindingFlags.OptionalParamBinding
 
     @staticmethod
+    def _to_object_array(values):
+        values = values or ()
+        arr = Array.CreateInstance(Object, len(values))
+        for idx, value in enumerate(values):
+            arr[idx] = value
+        return arr
+
+    @staticmethod
     def get(target, name, *args):
         if target is None:
             return None
@@ -160,7 +223,7 @@ class ComInterop(object):
             ComInterop.FLAGS | BindingFlags.GetProperty,
             None,
             target,
-            args,
+            ComInterop._to_object_array(args),
         )
 
     @staticmethod
@@ -172,7 +235,7 @@ class ComInterop(object):
             ComInterop.FLAGS | BindingFlags.SetProperty,
             None,
             target,
-            [value],
+            ComInterop._to_object_array((value,)),
         )
 
     @staticmethod
@@ -184,7 +247,7 @@ class ComInterop(object):
             ComInterop.FLAGS | BindingFlags.InvokeMethod,
             None,
             target,
-            args,
+            ComInterop._to_object_array(args),
         )
 
     @staticmethod
@@ -209,7 +272,162 @@ class ExcelDatabase(object):
     HEADER_DRAWING_NUMBER = "Drawing Number"
 
     @staticmethod
+    def _path_exists_with_retry(path, retries=8, sleep_ms=150):
+        candidate = (path or '').strip()
+        if not candidate:
+            return False
+        for _ in range(retries):
+            if op.exists(candidate):
+                return True
+            Thread.Sleep(sleep_ms)
+        return op.exists(candidate)
+
+    @staticmethod
+    def _is_csv_path(path):
+        try:
+            return op.splitext(path or '')[1].lower() == '.csv'
+        except Exception:
+            return False
+
+    @staticmethod
+    def _to_text(value):
+        if value is None:
+            return ''
+        try:
+            if isinstance(value, unicode):
+                return value
+        except Exception:
+            pass
+        try:
+            if isinstance(value, str):
+                try:
+                    return value.decode('utf-8')
+                except Exception:
+                    return value.decode('cp1252', 'ignore')
+        except Exception:
+            pass
+        try:
+            text = unicode(value)
+        except Exception:
+            text = str(value)
+        return normalize_match_text(text)
+
+    @staticmethod
+    def _csv_cell(value):
+        text = ExcelDatabase._to_text(value)
+        try:
+            return text.encode('utf-8')
+        except Exception:
+            return str(text)
+
+    @staticmethod
+    def _read_print_rows_csv(path):
+        result = []
+        if not op.exists(path):
+            return result
+
+        with open(path, 'rb') as csv_file:
+            reader = csv.reader(csv_file)
+            rows = list(reader)
+
+        if not rows:
+            return result
+
+        headers = {}
+        header_row = rows[0] or []
+        for idx, val in enumerate(header_row):
+            key = ExcelDatabase._to_text(val).strip().lstrip(u'\ufeff')
+            if key and key not in headers:
+                headers[key] = idx
+
+        col_file_name = headers.get(ExcelDatabase.HEADER_FILE_NAME, 0)
+        col_drawing_name = headers.get(ExcelDatabase.HEADER_DRAWING_NAME, 1)
+        col_drawing_number = headers.get(ExcelDatabase.HEADER_DRAWING_NUMBER, 2)
+
+        for row in rows[1:]:
+            if not row:
+                continue
+
+            def safe_get(col_idx):
+                if col_idx < 0 or col_idx >= len(row):
+                    return ''
+                return ExcelDatabase._to_text(row[col_idx]).strip()
+
+            drawing_name = normalize_match_text(safe_get(col_drawing_name))
+            if not drawing_name:
+                continue
+
+            file_name = safe_get(col_file_name)
+            drawing_number = normalize_match_text(safe_get(col_drawing_number))
+            result.append(ExcelPrintRow(file_name, drawing_name, drawing_number))
+
+        return result
+
+    @staticmethod
+    def _generate_or_update_csv(path, sheets, name_map=None, number_map=None, force_update=False):
+        existing_rows = ExcelDatabase._read_print_rows_csv(path) if op.exists(path) else []
+        row_by_name = {}
+        ordered_rows = []
+
+        for row in existing_rows:
+            key = (row.DrawingName or '').strip()
+            if key and key not in row_by_name:
+                row_by_name[key] = row
+                ordered_rows.append(row)
+
+        for view_sheet in sheets or []:
+            drawing_name = normalize_match_text(getattr(view_sheet, 'Name', ''))
+            drawing_number = normalize_match_text(getattr(view_sheet, 'SheetNumber', ''))
+            if not drawing_name:
+                continue
+            default_file_name = "{0}_{1}".format(drawing_number, drawing_name)
+
+            mapped_name = None
+            if name_map and drawing_name in name_map:
+                mapped_name = name_map.get(drawing_name)
+            elif number_map and drawing_number in number_map:
+                mapped_name = number_map.get(drawing_number)
+
+            if isinstance(mapped_name, (list, tuple)):
+                mapped_values = [normalize_match_text(x) for x in mapped_name if normalize_match_text(x)]
+            else:
+                mapped_text = normalize_match_text(mapped_name) if mapped_name else ''
+                mapped_values = [mapped_text] if mapped_text else []
+
+            if not mapped_values:
+                mapped_values = [default_file_name]
+
+            # Replace any existing rows for the same drawing name so that
+            # CSV can carry one or multiple file-name variants per sheet.
+            ordered_rows = [r for r in ordered_rows if normalize_match_text(r.DrawingName) != drawing_name]
+
+            for mapped_value in mapped_values:
+                ordered_rows.append(ExcelPrintRow(mapped_value, drawing_name, drawing_number))
+            row_by_name[drawing_name] = ordered_rows[-1]
+
+        with open(path, 'wb') as csv_file:
+            csv_file.write(codecs.BOM_UTF8)
+            writer = csv.writer(csv_file)
+            writer.writerow([
+                ExcelDatabase._csv_cell(ExcelDatabase.HEADER_FILE_NAME),
+                ExcelDatabase._csv_cell(ExcelDatabase.HEADER_DRAWING_NAME),
+                ExcelDatabase._csv_cell(ExcelDatabase.HEADER_DRAWING_NUMBER),
+            ])
+            for row in ordered_rows:
+                writer.writerow([
+                    ExcelDatabase._csv_cell(row.PrintFileName),
+                    ExcelDatabase._csv_cell(row.DrawingName),
+                    ExcelDatabase._csv_cell(row.DrawingNumber),
+                ])
+
+        return op.abspath(path)
+
+    @staticmethod
     def generate_or_update(path, sheets, name_map=None, number_map=None, force_update=False):
+        if ExcelDatabase._is_csv_path(path):
+            return ExcelDatabase._generate_or_update_csv(
+                path, sheets, name_map=name_map, number_map=number_map, force_update=force_update)
+
         excel = None
         workbooks = None
         workbook = None
@@ -217,6 +435,7 @@ class ExcelDatabase(object):
         sheet = None
         used_range = None
         cells = None
+        saved_path = path
 
         try:
             excel_type = Type.GetTypeFromProgID("Excel.Application")
@@ -225,6 +444,7 @@ class ExcelDatabase(object):
 
             excel = Activator.CreateInstance(excel_type)
             ComInterop.set(excel, "Visible", False)
+            ComInterop.set(excel, "DisplayAlerts", False)
 
             workbooks = ComInterop.get(excel, "Workbooks")
             if op.exists(path):
@@ -284,7 +504,38 @@ class ExcelDatabase(object):
             if op.exists(path):
                 ComInterop.call(workbook, "Save")
             else:
-                ComInterop.call(workbook, "SaveAs", path)
+                saved = False
+                try:
+                    ComInterop.call(workbook, "SaveAs", path)
+                    saved = ExcelDatabase._path_exists_with_retry(path)
+                except Exception:
+                    saved = False
+
+                # Excel can silently ignore SaveAs in some COM contexts unless
+                # explicit file format is provided or copy-save is used.
+                if not saved:
+                    try:
+                        ComInterop.call(workbook, "SaveAs", path, 51)  # xlOpenXMLWorkbook
+                        saved = ExcelDatabase._path_exists_with_retry(path)
+                    except Exception:
+                        saved = False
+
+                if not saved:
+                    try:
+                        ComInterop.call(workbook, "SaveCopyAs", path)
+                        saved = ExcelDatabase._path_exists_with_retry(path)
+                    except Exception:
+                        saved = False
+
+            if not ExcelDatabase._path_exists_with_retry(path):
+                workbook_fullname = ComInterop.get(workbook, "FullName")
+                if workbook_fullname:
+                    workbook_fullname = op.abspath(str(workbook_fullname))
+                    if ExcelDatabase._path_exists_with_retry(workbook_fullname):
+                        saved_path = workbook_fullname
+            if not ExcelDatabase._path_exists_with_retry(saved_path):
+                raise Exception("Excel save completed but no file was created on disk.")
+            return saved_path
         finally:
             if workbook is not None:
                 ComInterop.call(workbook, "Close", False)
@@ -301,6 +552,9 @@ class ExcelDatabase(object):
 
     @staticmethod
     def read_print_rows(path):
+        if ExcelDatabase._is_csv_path(path):
+            return ExcelDatabase._read_print_rows_csv(path)
+
         result = []
 
         excel = None
@@ -323,63 +577,7 @@ class ExcelDatabase(object):
             worksheets = ComInterop.get(workbook, "Worksheets")
             sheet = ComInterop.get(worksheets, "Item", 1)
             used_range = ComInterop.get(sheet, "UsedRange")
-            values = coerce_to_2d(ComInterop.get(used_range, "Value2"))
-
-            if values is None:
-                return result
-
-            row_start = values.GetLowerBound(0)
-            row_end = values.GetUpperBound(0)
-            col_start = values.GetLowerBound(1)
-            col_end = values.GetUpperBound(1)
-
-            headers = {}
-            header_row = row_start
-            for col in range(col_start, col_end + 1):
-                header_val = values[header_row, col]
-                if header_val is None:
-                    continue
-                header = str(header_val).strip()
-                if not header:
-                    continue
-                if header not in headers:
-                    headers[header] = (col - col_start) + 1
-
-            col_file_name = headers.get(ExcelDatabase.HEADER_FILE_NAME, 1)
-            col_drawing_name = headers.get(ExcelDatabase.HEADER_DRAWING_NAME, 2)
-            col_drawing_number = headers.get(ExcelDatabase.HEADER_DRAWING_NUMBER, 3)
-
-            col_file_index = col_file_name - 1 + col_start
-            col_drawing_index = col_drawing_name - 1 + col_start
-            col_number_index = col_drawing_number - 1 + col_start
-
-            if col_drawing_index < col_start or col_drawing_index > col_end:
-                return result
-
-            for row in range(row_start + 1, row_end + 1):
-                drawing_name_val = values[row, col_drawing_index]
-                if drawing_name_val is None:
-                    continue
-
-                drawing_name = str(drawing_name_val).strip()
-                if not drawing_name:
-                    continue
-
-                file_name = ""
-                if col_file_index >= col_start and col_file_index <= col_end:
-                    file_name_val = values[row, col_file_index]
-                    if file_name_val is not None:
-                        file_name = str(file_name_val).strip()
-
-                drawing_number = ""
-                if col_number_index >= col_start and col_number_index <= col_end:
-                    drawing_number_val = values[row, col_number_index]
-                    if drawing_number_val is not None:
-                        drawing_number = str(drawing_number_val).strip()
-
-                result.append(ExcelPrintRow(file_name, drawing_name, drawing_number))
-
-            return result
+            return ExcelDatabase.read_print_rows_from_used_range(used_range)
         finally:
             if workbook is not None:
                 ComInterop.call(workbook, "Close", False)
@@ -392,6 +590,71 @@ class ExcelDatabase(object):
             ComInterop.release(workbook)
             ComInterop.release(workbooks)
             ComInterop.release(excel)
+
+    @staticmethod
+    def read_print_rows_from_used_range(used_range):
+        result = []
+        if used_range is None:
+            return result
+
+        cells = None
+        rows_obj = None
+        cols_obj = None
+        try:
+            cells = ComInterop.get(used_range, "Cells")
+            rows_obj = ComInterop.get(used_range, "Rows")
+            cols_obj = ComInterop.get(used_range, "Columns")
+
+            row_count = int(ComInterop.get(rows_obj, "Count") or 0)
+            col_count = int(ComInterop.get(cols_obj, "Count") or 0)
+            if row_count < 1 or col_count < 1:
+                return result
+
+            headers = {}
+            for col in range(1, col_count + 1):
+                header_val = ExcelDatabase.get_cell_value(cells, 1, col)
+                if header_val is None:
+                    continue
+                header = str(header_val).strip()
+                if not header:
+                    continue
+                if header not in headers:
+                    headers[header] = col
+
+            col_file_name = headers.get(ExcelDatabase.HEADER_FILE_NAME, 1)
+            col_drawing_name = headers.get(ExcelDatabase.HEADER_DRAWING_NAME, 2)
+            col_drawing_number = headers.get(ExcelDatabase.HEADER_DRAWING_NUMBER, 3)
+
+            if col_drawing_name < 1 or col_drawing_name > col_count:
+                return result
+
+            for row in range(2, row_count + 1):
+                drawing_name_val = ExcelDatabase.get_cell_value(cells, row, col_drawing_name)
+                if drawing_name_val is None:
+                    continue
+
+                drawing_name = str(drawing_name_val).strip()
+                if not drawing_name:
+                    continue
+
+                file_name = ""
+                if col_file_name >= 1 and col_file_name <= col_count:
+                    file_name_val = ExcelDatabase.get_cell_value(cells, row, col_file_name)
+                    if file_name_val is not None:
+                        file_name = str(file_name_val).strip()
+
+                drawing_number = ""
+                if col_drawing_number >= 1 and col_drawing_number <= col_count:
+                    drawing_number_val = ExcelDatabase.get_cell_value(cells, row, col_drawing_number)
+                    if drawing_number_val is not None:
+                        drawing_number = str(drawing_number_val).strip()
+
+                result.append(ExcelPrintRow(file_name, drawing_name, drawing_number))
+            return result
+        finally:
+            ComInterop.release(cols_obj)
+            ComInterop.release(rows_obj)
+            ComInterop.release(cells)
 
     @staticmethod
     def read_existing_rows(values, col_drawing_name):
@@ -670,19 +933,47 @@ class VariablePaperPrintSettingListItem(PrintSettingListItem):
 
 
 class EditNamingFormatsWindow(forms.WPFWindow):
-    def __init__(self, xaml_file_name, start_with=None):
+    def __init__(self, xaml_file_name, start_with=None, doc=None):
         forms.WPFWindow.__init__(self, xaml_file_name)
 
         self._drop_pos = 0
         self._starting_item = start_with
         self._saved = False
+        self._doc = doc
 
         self.reset_naming_formats()
         self.reset_formatters()
 
     @staticmethod
-    def get_default_formatters():
-        return [
+    def _get_project_param_names(doc):
+        names = []
+        if not doc:
+            return names
+        try:
+            params = doc.ProjectInformation.Parameters
+        except Exception:
+            params = None
+        if not params:
+            return names
+        try:
+            for p in params:
+                try:
+                    name = p.Definition.Name if p and p.Definition else None
+                except Exception:
+                    name = None
+                if name and name not in names:
+                    names.append(name)
+        except Exception:
+            pass
+        try:
+            names.sort(key=lambda x: x.lower())
+        except Exception:
+            pass
+        return names
+
+    @staticmethod
+    def get_default_formatters(doc=None):
+        formatters = [
             NamingFormatter(
                 template='{index}',
                 desc='Print Index Number e.g. "0001"'
@@ -785,6 +1076,17 @@ class EditNamingFormatsWindow(forms.WPFWindow):
             ),
         ]
 
+        proj_params = EditNamingFormatsWindow._get_project_param_names(doc)
+        for pname in proj_params:
+            formatters.append(
+                NamingFormatter(
+                    template='{proj_param:%s}' % pname,
+                    desc='Project Parameter: %s' % pname
+                )
+            )
+
+        return formatters
+
     @staticmethod
     def get_default_naming_formats():
         return [
@@ -836,7 +1138,7 @@ class EditNamingFormatsWindow(forms.WPFWindow):
 
     def reset_formatters(self):
         self.formatters_wp.ItemsSource = \
-            EditNamingFormatsWindow.get_default_formatters()
+            EditNamingFormatsWindow.get_default_formatters(self._doc)
 
     def reset_naming_formats(self):
         self.formats_lb.ItemsSource = \
@@ -1039,6 +1341,8 @@ class PrintSheetsWindow(forms.WPFWindow):
         self._excel_rows_by_number = {}
         self._excel_path = ''
         self._scheduler = None
+        self._scheduled_execution = False
+        self._suppress_csv_popups = False
 
         self.project_info = revit.query.get_project_info(doc=revit.doc)
         self.sheet_cat_id = \
@@ -1335,13 +1639,21 @@ class PrintSheetsWindow(forms.WPFWindow):
             path = self.excel_path_tb.Text if hasattr(self, 'excel_path_tb') else ''
         except Exception:
             path = ''
-        path = path or ''
+        path = self._normalize_excel_path(path)
         self._excel_path = path
         if not path:
             return
-        if not op.exists(path):
+        resolved_path = self._resolve_excel_path(path)
+        if not resolved_path:
             forms.alert("Excel file not found:\n{}".format(path))
             return
+        if resolved_path != path:
+            path = resolved_path
+            self._excel_path = path
+            try:
+                self.excel_path_tb.Text = path
+            except Exception:
+                pass
         try:
             rows = ExcelDatabase.read_print_rows(path)
         except Exception as ex:
@@ -1349,27 +1661,87 @@ class PrintSheetsWindow(forms.WPFWindow):
             return
 
         for row in rows:
-            if row.DrawingName and row.DrawingName not in self._excel_rows_by_name:
-                self._excel_rows_by_name[row.DrawingName] = row
-            if row.DrawingNumber and row.DrawingNumber not in self._excel_rows_by_number:
-                self._excel_rows_by_number[row.DrawingNumber] = row
+            drawing_name_key = normalize_match_text(row.DrawingName)
+            drawing_number_key = normalize_match_text(row.DrawingNumber)
+            if drawing_name_key and drawing_name_key not in self._excel_rows_by_name:
+                self._excel_rows_by_name[drawing_name_key] = row
+            if drawing_number_key and drawing_number_key not in self._excel_rows_by_number:
+                self._excel_rows_by_number[drawing_number_key] = row
 
     def _get_excel_row(self, sheet):
         if not sheet:
             return None
         try:
-            if sheet.name in self._excel_rows_by_name:
-                return self._excel_rows_by_name.get(sheet.name)
-            if sheet.number in self._excel_rows_by_number:
-                return self._excel_rows_by_number.get(sheet.number)
+            sheet_name_key = normalize_match_text(sheet.name)
+            sheet_number_key = normalize_match_text(sheet.number)
+            if sheet_name_key in self._excel_rows_by_name:
+                return self._excel_rows_by_name.get(sheet_name_key)
+            if sheet_number_key in self._excel_rows_by_number:
+                return self._excel_rows_by_number.get(sheet_number_key)
         except Exception:
             return None
         return None
 
+    def _normalize_excel_path(self, path):
+        path = (path or '').strip().strip('"')
+        if not path:
+            return ''
+        normalized = op.abspath(op.expanduser(path))
+        if not op.splitext(normalized)[1]:
+            normalized += '.csv'
+        return normalized
+
+    def _resolve_excel_path(self, path):
+        normalized = self._normalize_excel_path(path)
+        if not normalized:
+            return ''
+        if op.exists(normalized):
+            return normalized
+        base, _ = op.splitext(normalized)
+        for candidate_ext in ('.xlsx', '.xlsm', '.xls', '.csv'):
+            candidate = base + candidate_ext
+            if op.exists(candidate):
+                return candidate
+        return ''
+
+    def _pick_excel_file_path(self):
+        try:
+            dialog = OpenFileDialog()
+            dialog.Filter = "Database Files (*.xlsx;*.xlsm;*.xls;*.csv)|*.xlsx;*.xlsm;*.xls;*.csv|Excel Files (*.xlsx;*.xlsm;*.xls)|*.xlsx;*.xlsm;*.xls|CSV Files (*.csv)|*.csv|All Files (*.*)|*.*"
+            dialog.Multiselect = False
+            dialog.CheckFileExists = True
+            if dialog.ShowDialog():
+                return dialog.FileName
+        except Exception:
+            pass
+        return forms.pick_file(file_ext='csv', multi_file=False, title='Select CSV Database')
+
+    def _save_excel_file_path(self, current_path=''):
+        try:
+            dialog = SaveFileDialog()
+            dialog.Filter = "CSV Files (*.csv)|*.csv|Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*"
+            dialog.DefaultExt = "csv"
+            dialog.AddExtension = True
+            dialog.OverwritePrompt = True
+            normalized_current = self._normalize_excel_path(current_path)
+            if normalized_current:
+                current_dir = op.dirname(normalized_current)
+                if current_dir and op.exists(current_dir):
+                    dialog.InitialDirectory = current_dir
+                dialog.FileName = op.basename(normalized_current)
+            else:
+                dialog.FileName = "PrintDatabase.csv"
+            if dialog.ShowDialog():
+                return dialog.FileName
+        except Exception:
+            pass
+        return forms.save_file(file_ext='csv', title='Save CSV Database', default_name='PrintDatabase.csv')
+
     def browse_excel(self, sender, args):
-        excel_file = forms.pick_file(file_ext=['xlsx', 'xls'], multi_file=False, title='Select Excel Database')
+        excel_file = self._pick_excel_file_path()
         if not excel_file:
             return
+        excel_file = self._normalize_excel_path(excel_file)
         try:
             self.excel_path_tb.Text = excel_file
         except Exception:
@@ -1383,14 +1755,19 @@ class PrintSheetsWindow(forms.WPFWindow):
             path = self.excel_path_tb.Text
         except Exception:
             path = ''
+        path = self._normalize_excel_path(path)
         if not path:
-            path = forms.save_file(file_ext='xlsx', title='Save Excel Database', default_name='PrintDatabase.xlsx')
+            path = self._save_excel_file_path(path)
             if not path:
                 return
-            try:
-                self.excel_path_tb.Text = path
-            except Exception:
-                pass
+        path = self._normalize_excel_path(path)
+        parent_dir = op.dirname(path)
+        if parent_dir and not op.exists(parent_dir):
+            os.makedirs(parent_dir)
+        try:
+            self.excel_path_tb.Text = path
+        except Exception:
+            pass
 
         sheets = []
         try:
@@ -1407,10 +1784,11 @@ class PrintSheetsWindow(forms.WPFWindow):
             except Exception:
                 sheets = []
         try:
-            ExcelDatabase.generate_or_update(path, sheets)
+            path = op.abspath(ExcelDatabase.generate_or_update(path, sheets))
+            self.excel_path_tb.Text = path
             forms.alert("Excel updated:\n{}".format(path), ok=True)
         except Exception as ex:
-            forms.alert("Excel update failed:\n{}\n{}".format(path, ex))
+            forms.alert("CSV update failed:\n{}\n{}".format(path, ex))
             return
 
         self._load_excel_rows()
@@ -1614,7 +1992,7 @@ class PrintSheetsWindow(forms.WPFWindow):
                 return
             if target_sheets:
                 if self.export_pdf_enabled and self.export_dwg_enabled:
-                    with forms.ProgressBar(step=1, title='Exporting PDF & DWGs... ' + '{value} of {max_value}', cancellable=True) as pb1:
+                    with forms.ProgressBar(step=1, title='Exporting PDF & DWGs... ' + '{value} of {max_value}', cancellable=(not self._scheduled_execution)) as pb1:
                         pbTotal1 = len(target_sheets) * 2
                         pbCount1 = 1
                         for sheet in target_sheets:
@@ -1660,7 +2038,7 @@ class PrintSheetsWindow(forms.WPFWindow):
                                     logger.debug('Sheet %s is not printable. Skipping print.',
                                                 sheet.number)
                 elif self.export_pdf_enabled:
-                    with forms.ProgressBar(step=1, title='Exporting PDFs... ' + '{value} of {max_value}', cancellable=True) as pb1:
+                    with forms.ProgressBar(step=1, title='Exporting PDFs... ' + '{value} of {max_value}', cancellable=(not self._scheduled_execution)) as pb1:
                         pbTotal1 = len(target_sheets)
                         pbCount1 = 1
                         for sheet in target_sheets:
@@ -1699,7 +2077,7 @@ class PrintSheetsWindow(forms.WPFWindow):
                                     logger.debug('Sheet %s is not printable. Skipping print.',
                                                 sheet.number)
                 elif self.export_dwg_enabled:
-                    with forms.ProgressBar(step=1, title='Exporting DWGs... ' + '{value} of {max_value}', cancellable=True) as pb1:
+                    with forms.ProgressBar(step=1, title='Exporting DWGs... ' + '{value} of {max_value}', cancellable=(not self._scheduled_execution)) as pb1:
                         pbTotal1 = len(target_sheets)
                         pbCount1 = 1
                         for sheet in target_sheets:
@@ -1750,7 +2128,7 @@ class PrintSheetsWindow(forms.WPFWindow):
             return
 
         if target_sheets:
-            with forms.ProgressBar(step=1, title='Exporting Linked PDFs... ' + '{value} of {max_value}', cancellable=True) as pb1:
+            with forms.ProgressBar(step=1, title='Exporting Linked PDFs... ' + '{value} of {max_value}', cancellable=(not self._scheduled_execution)) as pb1:
                 
                 pbTotal1 = len(target_sheets)
                 pbCount1 = 1
@@ -2183,7 +2561,8 @@ class PrintSheetsWindow(forms.WPFWindow):
         editfmt_wnd = \
             EditNamingFormatsWindow(
                 'EditNamingFormats.xaml',
-                start_with=self.selected_naming_format
+                start_with=self.selected_naming_format,
+                doc=self.selected_doc
                 )
         editfmt_wnd.show_dialog()
         self.namingformat_cb.ItemsSource = editfmt_wnd.naming_formats
@@ -2194,17 +2573,34 @@ class PrintSheetsWindow(forms.WPFWindow):
             filenames = [x.print_filename for x in self.selected_sheets]
             script.clipboard_copy('\n'.join(filenames))
 
-    def _validate_excel_path(self):
+    def _is_csv_writeback_enabled(self):
+        try:
+            if hasattr(self, 'excel_writeback_cb') and self.excel_writeback_cb:
+                return bool(self.excel_writeback_cb.IsChecked)
+        except Exception:
+            pass
+        return False
+
+    def _validate_excel_path(self, require_nonempty=False):
         try:
             path = self.excel_path_tb.Text
         except Exception:
             path = ''
-        path = path or ''
+        path = self._normalize_excel_path(path)
         if not path:
+            if require_nonempty:
+                forms.alert('Pick a CSV file path before scheduling.')
+                return False
             return True
-        if not op.exists(path):
-            forms.alert('Excel file not found:\n{}'.format(path))
+        resolved_path = self._resolve_excel_path(path)
+        if not resolved_path:
+            forms.alert('CSV file not found:\n{}'.format(path))
             return False
+        if resolved_path != path:
+            try:
+                self.excel_path_tb.Text = resolved_path
+            except Exception:
+                pass
         return True
 
     def _validate_export_options(self):
@@ -2232,6 +2628,7 @@ class PrintSheetsWindow(forms.WPFWindow):
     def _run_print(self, target_sheets, confirm=True, close_window=True):
         if not target_sheets:
             return
+        is_scheduled_run = (not confirm)
         if not self._validate_export_options():
             return
         if not self._validate_excel_path():
@@ -2259,17 +2656,80 @@ class PrintSheetsWindow(forms.WPFWindow):
                                        'not be cancelled.'.format(message),
                                        ok=False, yes=True, no=True):
                         return
-        if close_window:
-            self.Close()
-        if self.combine_print:
-            self._print_combined_sheets_in_order(target_sheets)
-        else:
-            if self.selected_doc.IsLinked:
-                self._print_linked_sheets_in_order(target_sheets, self.selected_doc)
-            else:
-                self._print_sheets_in_order(target_sheets)
 
-        self._update_excel_report(target_sheets)
+        writeback_enabled = self._is_csv_writeback_enabled()
+
+        # Write Excel first so print outputs and database stay in sync.
+        # If writeback is enabled and fails, stop before printing.
+        if writeback_enabled:
+            # Keep manual runs interactive, but avoid CSV popups during scheduled runs.
+            show_csv_alerts = bool(confirm) and (not self._suppress_csv_popups)
+            wrote = self._write_excel_report(target_sheets,
+                                             require_writeback_opt=True,
+                                             allow_create=False,
+                                             recompute_names=True,
+                                             show_alert=show_csv_alerts,
+                                             dry_run_mode=False)
+            if not wrote:
+                return
+
+        if is_scheduled_run:
+            self._set_schedule_status_text("Syncing before scheduled print...")
+            if not self._sync_before_scheduled_print():
+                self._set_schedule_status_text("Scheduled print cancelled: pre-sync failed.")
+                return
+
+        prev_scheduled_execution = self._scheduled_execution
+        self._scheduled_execution = is_scheduled_run
+        try:
+            if close_window:
+                self.Close()
+            if self.combine_print:
+                self._print_combined_sheets_in_order(target_sheets)
+            else:
+                if self.selected_doc.IsLinked:
+                    self._print_linked_sheets_in_order(target_sheets, self.selected_doc)
+                else:
+                    self._print_sheets_in_order(target_sheets)
+        finally:
+            self._scheduled_execution = prev_scheduled_execution
+
+    def _sync_before_scheduled_print(self):
+        sync_doc = self.selected_doc if self.selected_doc else revit.doc
+        if sync_doc is None:
+            return True
+
+        try:
+            if hasattr(sync_doc, 'IsLinked') and sync_doc.IsLinked:
+                return True
+        except Exception:
+            pass
+
+        try:
+            if not hasattr(sync_doc, 'IsWorkshared') or not sync_doc.IsWorkshared:
+                return True
+        except Exception:
+            return True
+
+        try:
+            if hasattr(sync_doc, 'IsDetached') and sync_doc.IsDetached:
+                return True
+        except Exception:
+            pass
+
+        try:
+            twc_opts = DB.TransactWithCentralOptions()
+            sync_opts = DB.SynchronizeWithCentralOptions()
+            rel_opts = DB.RelinquishOptions(True)
+            sync_opts.SetRelinquishOptions(rel_opts)
+            sync_opts.Comment = "Scheduled print pre-sync"
+            sync_opts.Compact = False
+            sync_doc.SynchronizeWithCentral(twc_opts, sync_opts)
+            logger.info("Scheduled print pre-sync completed.")
+            return True
+        except Exception as ex:
+            logger.error("Scheduled print pre-sync failed: %s", ex)
+            return False
 
     def print_sheets(self, sender, args):
         target_sheets = self._get_target_sheets(ask_user=True)
@@ -2285,6 +2745,8 @@ class PrintSheetsWindow(forms.WPFWindow):
             return
         if not self._validate_excel_path():
             return
+        if self._is_csv_writeback_enabled() and not self._validate_excel_path(require_nonempty=True):
+            return
         run_at = self._parse_schedule_time()
         if run_at is None:
             return
@@ -2292,6 +2754,19 @@ class PrintSheetsWindow(forms.WPFWindow):
             self._scheduler = PrintScheduler(self)
         self._scheduler.set_job(ScheduledJob(run_at, target_sheets))
         self._update_schedule_status()
+
+    def write_excel_dry_run(self, sender, args):
+        target_sheets = self._get_target_sheets(ask_user=True)
+        if not target_sheets:
+            return
+        if self._write_excel_report(target_sheets,
+                                    require_writeback_opt=False,
+                                    allow_create=True,
+                                    recompute_names=True,
+                                    show_alert=True,
+                                    dry_run_mode=True):
+            self._load_excel_rows()
+            self.options_changed(None, None)
 
     def cancel_schedule(self, sender, args):
         if self._scheduler:
@@ -2339,24 +2814,142 @@ class PrintSheetsWindow(forms.WPFWindow):
         except Exception:
             pass
 
-    def _update_excel_report(self, target_sheets):
-        if not target_sheets:
-            return
+    def _set_schedule_status_text(self, message):
         try:
-            if hasattr(self, 'excel_writeback_cb') and self.excel_writeback_cb:
-                if not self.excel_writeback_cb.IsChecked:
-                    return
+            if self.schedule_status_tb:
+                self.schedule_status_tb.Text = message
         except Exception:
             pass
+
+    def _update_excel_report(self, target_sheets):
+        self._write_excel_report(target_sheets,
+                                 require_writeback_opt=True,
+                                 allow_create=False,
+                                 recompute_names=False,
+                                 show_alert=False)
+
+    def _collect_revit_sheets(self, target_sheets):
+        revit_sheets = []
+        seen_ids = set()
+        source = target_sheets or []
+
+        for item in source:
+            revit_sheet = None
+            try:
+                if hasattr(item, 'revit_sheet') and item.revit_sheet:
+                    revit_sheet = item.revit_sheet
+                elif hasattr(item, 'SheetNumber') and hasattr(item, 'Name'):
+                    revit_sheet = item
+            except Exception:
+                revit_sheet = None
+
+            if not revit_sheet:
+                continue
+
+            try:
+                sid = str(get_elementid_value(revit_sheet.Id))
+            except Exception:
+                sid = str(id(revit_sheet))
+
+            if sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+            revit_sheets.append(revit_sheet)
+
+        if not revit_sheets:
+            try:
+                fallback = [x.revit_sheet for x in (self.sheet_list or [])
+                            if hasattr(x, 'revit_sheet') and x.revit_sheet]
+            except Exception:
+                fallback = []
+            for revit_sheet in fallback:
+                try:
+                    sid = str(get_elementid_value(revit_sheet.Id))
+                except Exception:
+                    sid = str(id(revit_sheet))
+                if sid in seen_ids:
+                    continue
+                seen_ids.add(sid)
+                revit_sheets.append(revit_sheet)
+
+        return revit_sheets
+
+    def _write_excel_report(self, target_sheets,
+                            require_writeback_opt=True,
+                            allow_create=False,
+                            recompute_names=False,
+                            show_alert=False,
+                            dry_run_mode=False):
+        if not target_sheets:
+            return False
+
+        if require_writeback_opt:
+            try:
+                if hasattr(self, 'excel_writeback_cb') and self.excel_writeback_cb:
+                    if not self.excel_writeback_cb.IsChecked:
+                        return False
+            except Exception:
+                pass
+
         try:
             path = self.excel_path_tb.Text
         except Exception:
             path = ''
-        path = path or ''
+
+        path = self._normalize_excel_path(path or '')
+        if not path and allow_create:
+            path = self._save_excel_file_path(path)
+            path = self._normalize_excel_path(path)
+
         if not path:
-            return
-        if not op.exists(path):
-            return
+            if show_alert:
+                forms.alert("Pick a CSV file path first.")
+            return False
+
+        parent_dir = op.dirname(path)
+        if parent_dir and not op.exists(parent_dir):
+            os.makedirs(parent_dir)
+
+        resolved_path = self._resolve_excel_path(path)
+        if resolved_path:
+            path = resolved_path
+        elif not allow_create:
+            return False
+
+        try:
+            self.excel_path_tb.Text = path
+        except Exception:
+            pass
+
+        if op.exists(path):
+            self._load_excel_rows()
+        else:
+            # Prevent options refresh from trying to load a file that
+            # is about to be created by this write operation.
+            self._excel_path = path
+            self._excel_rows_by_name = {}
+            self._excel_rows_by_number = {}
+
+        if recompute_names:
+            # Dry run should be based on current options, not existing CSV/Excel
+            # override names from previous runs.
+            backup_name_rows = self._excel_rows_by_name
+            backup_number_rows = self._excel_rows_by_number
+            try:
+                self._excel_rows_by_name = {}
+                self._excel_rows_by_number = {}
+                self.options_changed(None, None)
+            finally:
+                self._excel_rows_by_name = backup_name_rows
+                self._excel_rows_by_number = backup_number_rows
+
+        is_csv_target = ExcelDatabase._is_csv_path(path)
+        include_ext = False
+        try:
+            if hasattr(self, 'csv_include_ext_cb') and self.csv_include_ext_cb:
+                include_ext = bool(self.csv_include_ext_cb.IsChecked)
+        except Exception:
+            include_ext = False
 
         name_map = {}
         number_map = {}
@@ -2364,18 +2957,53 @@ class PrintSheetsWindow(forms.WPFWindow):
             try:
                 if not sheet.print_filename:
                     continue
-                base_name = op.splitext(sheet.print_filename)[0]
-                name_map[sheet.name] = base_name
-                if sheet.number:
-                    number_map[sheet.number] = base_name
+                sheet_name_key = normalize_match_text(sheet.name)
+                sheet_number_key = normalize_match_text(sheet.number)
+                base_name = normalize_match_text(op.splitext(sheet.print_filename)[0])
+                if include_ext:
+                    pdf_enabled = bool(self.export_pdf_enabled)
+                    dwg_enabled = bool(self.export_dwg_enabled)
+                    if pdf_enabled and dwg_enabled and is_csv_target:
+                        file_name_value = [base_name + ".pdf", base_name + ".dwg"]
+                    elif pdf_enabled and dwg_enabled:
+                        file_name_value = "{}.pdf;{}.dwg".format(base_name, base_name)
+                    elif dwg_enabled:
+                        file_name_value = base_name + ".dwg"
+                    else:
+                        file_name_value = base_name + ".pdf"
+                else:
+                    file_name_value = base_name
+                name_map[sheet_name_key] = file_name_value
+                if sheet_number_key:
+                    number_map[sheet_number_key] = file_name_value
             except Exception:
                 continue
 
+        sheets = self._collect_revit_sheets(target_sheets)
+        if not sheets:
+            if show_alert:
+                forms.alert("No sheets available to write to CSV.")
+            return False
+
         try:
-            sheets = [x.revit_sheet for x in target_sheets if x and x.revit_sheet]
-            ExcelDatabase.generate_or_update(path, sheets, name_map=name_map, number_map=number_map, force_update=True)
+            path = op.abspath(ExcelDatabase.generate_or_update(
+                path, sheets, name_map=name_map, number_map=number_map, force_update=True))
+            try:
+                self.excel_path_tb.Text = path
+            except Exception:
+                pass
+            if show_alert:
+                if dry_run_mode:
+                    forms.alert("CSV updated (dry run, no printing):\n{}\nRows written: {}".format(path, len(sheets)), ok=True)
+                else:
+                    forms.alert("CSV updated:\n{}\nRows written: {}".format(path, len(sheets)), ok=True)
+            return True
         except Exception as ex:
-            logger.error("Failed to update Excel report: %s", ex)
+            if show_alert:
+                forms.alert("CSV update failed:\n{}\n{}".format(path, ex))
+            else:
+                logger.error("Failed to update Excel report: %s", ex)
+            return False
 
     def window_closing(self, sender, args):
         if self._scheduler and self._scheduler.has_job:
@@ -2393,6 +3021,7 @@ class ScheduledJob(object):
         self.RunAt = run_at
         self.TargetSheets = list(target_sheets) if target_sheets else []
         self.IsRunning = False
+        self.RemindersShown = set()
 
 
 class PrintScheduler(object):
@@ -2401,8 +3030,16 @@ class PrintScheduler(object):
         self._job = None
         self._uiapp = revit.uidoc.Application if revit.uidoc else None
         self._handler = self.on_idling
+        self._timer = None
         if self._uiapp:
             self._uiapp.Idling += self._handler
+        try:
+            self._timer = Windows.Threading.DispatcherTimer()
+            self._timer.Interval = TimeSpan.FromSeconds(1)
+            self._timer.Tick += self.on_timer_tick
+            self._timer.Start()
+        except Exception as ex:
+            logger.warning("Failed to start schedule timer fallback: %s", ex)
 
     @property
     def has_job(self):
@@ -2418,28 +3055,109 @@ class PrintScheduler(object):
     def cancel_job(self):
         self._job = None
 
+    def _get_due_reminder_mark(self, job, remaining_seconds):
+        if remaining_seconds <= 0:
+            return None
+
+        remaining_int = int(remaining_seconds)
+        if remaining_int <= 0:
+            return None
+
+        # 10-second countdown in final 10 seconds.
+        if remaining_int <= 10:
+            return remaining_int if remaining_int not in job.RemindersShown else None
+
+        # Every 10 seconds once under 60 seconds (60, 50, 40, 30, 20).
+        if remaining_int <= 60:
+            mark = int(((remaining_int + 9) // 10) * 10)
+            if mark < 20:
+                mark = 20
+            if mark > 60:
+                mark = 60
+            return mark if mark not in job.RemindersShown else None
+
+        # One-time 5-minute reminder.
+        if remaining_int <= 300 and 300 not in job.RemindersShown:
+            return 300
+
+        return None
+
+    def _show_schedule_reminder(self, mark):
+        if mark == 300:
+            msg = "Scheduled print starts in 5 minutes."
+        elif mark >= 20:
+            msg = "Scheduled print starts in {} seconds.".format(mark)
+        else:
+            msg = "Scheduled print starts in {} second{}.".format(
+                mark, '' if mark == 1 else 's')
+
+        try:
+            self._window._set_schedule_status_text(msg)
+            logger.info(msg)
+            return True
+        except Exception as ex:
+            logger.warning("Schedule reminder update failed: %s", ex)
+            return True
+
+    def _handle_reminders(self, job):
+        try:
+            remaining_seconds = (job.RunAt - DateTime.Now).TotalSeconds
+            mark = self._get_due_reminder_mark(job, remaining_seconds)
+            if not mark:
+                return True
+
+            self._show_schedule_reminder(mark)
+            job.RemindersShown.add(mark)
+            return True
+        except Exception as ex:
+            logger.warning("Schedule reminder handling failed: %s", ex)
+            # Continue schedule even if reminder logic fails.
+            return True
+
     def shutdown(self):
+        if self._timer:
+            try:
+                self._timer.Stop()
+                self._timer.Tick -= self.on_timer_tick
+            except Exception:
+                pass
         if self._uiapp:
             try:
                 self._uiapp.Idling -= self._handler
             except Exception:
                 pass
 
-    def on_idling(self, sender, args):
-        if self._job is None or self._job.IsRunning:
-            return
-        if DateTime.Now < self._job.RunAt:
-            return
-        self._job.IsRunning = True
-        job = self._job
-        self._job = None
-        self._window._update_schedule_status()
+    def _process_schedule(self):
         try:
-            self._window._run_print(job.TargetSheets, confirm=False, close_window=True)
+            if self._job is None or self._job.IsRunning:
+                return
+            if DateTime.Now < self._job.RunAt:
+                self._handle_reminders(self._job)
+                return
+            self._job.IsRunning = True
+            job = self._job
+            self._job = None
+            self._window._set_schedule_status_text("Running scheduled print...")
+            try:
+                prev_suppress = self._window._suppress_csv_popups
+                self._window._suppress_csv_popups = True
+                self._window._run_print(job.TargetSheets, confirm=False, close_window=False)
+            except Exception as ex:
+                logger.error("Scheduled print failed: %s", ex)
+            finally:
+                try:
+                    self._window._suppress_csv_popups = prev_suppress
+                except Exception:
+                    self._window._suppress_csv_popups = False
+                self._window._update_schedule_status()
         except Exception as ex:
-            logger.error("Scheduled print failed: %s", ex)
-        finally:
-            self._window._update_schedule_status()
+            logger.error("Schedule idling handler failed: %s", ex)
+
+    def on_idling(self, sender, args):
+        self._process_schedule()
+
+    def on_timer_tick(self, sender, args):
+        self._process_schedule()
 
 
 def cleanup_sheetnumbers(doc):

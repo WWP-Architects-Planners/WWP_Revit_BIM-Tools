@@ -173,10 +173,10 @@
                     <StackPanel Grid.Column="0">
                         <TextBlock Text="Excel Mapping" FontWeight="SemiBold" />
                         <TextBox x:Name="ExcelPathBox" IsReadOnly="True" />
-                        <TextBlock x:Name="ExcelStatusText" Text="Column A = File Name. Column headers map to attributes (description)." Foreground="#4F4F4F" />
+                        <TextBlock x:Name="ExcelStatusText" Text="Column A = File Name. Column headers map to attributes (description, display name, item description) and custom attributes by name." Foreground="#4F4F4F" />
                     </StackPanel>
                     <Button x:Name="BrowseExcelButton" Grid.Column="1" Content="Browse" Height="30" Margin="8,18,8,0" />
-                    <Button x:Name="ApplyButton" Grid.Column="2" Content="Apply Descriptions" Height="30" Margin="8,18,0,0" />
+                    <Button x:Name="ApplyButton" Grid.Column="2" Content="Apply Updates" Height="30" Margin="8,18,0,0" />
                 </Grid>
             </Border>
         </Grid>
