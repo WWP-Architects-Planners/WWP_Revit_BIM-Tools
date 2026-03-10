@@ -134,7 +134,7 @@ public sealed class GeoPackageExporter
         var withHeight = layer.Layer == ContextLayer.Buildings;
         CreateLayerTable(conn, tableName, withHeight: withHeight);
 
-        var features = new List<(byte[] Blob, double MinX, double MinY, double MaxX, double MaxY, double? HeightM, string? HeightSource)>();
+        var features = new List<(byte[] Blob, double MinX, double MinY, double MaxX, double MaxY, double? BaseHeightM, double? HeightM, string? HeightSource)>();
         foreach (var line in layer.LineStrings)
         {
             var coords = line.Select(p => GeoProjection.ProjectForTarget(p, sourceEpsg, targetEpsg)).ToList();
@@ -144,7 +144,7 @@ public sealed class GeoPackageExporter
             }
 
             var built = BuildGeomBlob(2, coords, srsId);
-            features.Add((built.Blob, built.MinX, built.MinY, built.MaxX, built.MaxY, null, null));
+            features.Add((built.Blob, built.MinX, built.MinY, built.MaxX, built.MaxY, null, null, null));
         }
 
         for (var i = 0; i < layer.Polygons.Count; i++)
@@ -162,15 +162,17 @@ public sealed class GeoPackageExporter
             }
 
             var built = BuildGeomBlob(3, coords, srsId);
+            double? bh = null;
             double? h = null;
             string? hs = null;
             if (withHeight && i < layer.BuildingFootprints.Count)
             {
+                bh = Math.Round(layer.BuildingFootprints[i].BaseHeightMeters, 3);
                 h = Math.Round(layer.BuildingFootprints[i].HeightMeters, 3);
                 hs = layer.BuildingFootprints[i].HeightSource;
             }
 
-            features.Add((built.Blob, built.MinX, built.MinY, built.MaxX, built.MaxY, h, hs));
+            features.Add((built.Blob, built.MinX, built.MinY, built.MaxX, built.MaxY, bh, h, hs));
         }
 
         InsertFeatures(conn, tableName, features, withHeight: withHeight);
@@ -239,7 +241,7 @@ public sealed class GeoPackageExporter
         }
         else if (withHeight)
         {
-            cmd.CommandText = $"CREATE TABLE {tableName}(id INTEGER PRIMARY KEY AUTOINCREMENT, geom BLOB NOT NULL, height_m REAL, height_source TEXT);";
+            cmd.CommandText = $"CREATE TABLE {tableName}(id INTEGER PRIMARY KEY AUTOINCREMENT, geom BLOB NOT NULL, base_height_m REAL, height_m REAL, height_source TEXT);";
         }
         else
         {
@@ -251,22 +253,26 @@ public sealed class GeoPackageExporter
     private static void InsertFeatures(
         SqliteConnection conn,
         string tableName,
-        IReadOnlyList<(byte[] Blob, double MinX, double MinY, double MaxX, double MaxY, double? HeightM, string? HeightSource)> features,
+        IReadOnlyList<(byte[] Blob, double MinX, double MinY, double MaxX, double MaxY, double? BaseHeightM, double? HeightM, string? HeightSource)> features,
         bool withHeight = false)
     {
         using var tx = conn.BeginTransaction();
         using var cmd = conn.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = withHeight
-            ? $"INSERT INTO {tableName}(geom,height_m,height_source) VALUES ($geom,$height,$heightSource);"
+            ? $"INSERT INTO {tableName}(geom,base_height_m,height_m,height_source) VALUES ($geom,$baseHeight,$height,$heightSource);"
             : $"INSERT INTO {tableName}(geom) VALUES ($geom);";
         var geomParam = cmd.CreateParameter();
         geomParam.ParameterName = "$geom";
         cmd.Parameters.Add(geomParam);
+        SqliteParameter? baseHeightParam = null;
         SqliteParameter? heightParam = null;
         SqliteParameter? heightSourceParam = null;
         if (withHeight)
         {
+            baseHeightParam = cmd.CreateParameter();
+            baseHeightParam.ParameterName = "$baseHeight";
+            cmd.Parameters.Add(baseHeightParam);
             heightParam = cmd.CreateParameter();
             heightParam.ParameterName = "$height";
             cmd.Parameters.Add(heightParam);
@@ -279,6 +285,10 @@ public sealed class GeoPackageExporter
             geomParam.Value = f.Blob;
             if (withHeight && heightParam is not null)
             {
+                if (baseHeightParam is not null)
+                {
+                    baseHeightParam.Value = (object?)f.BaseHeightM ?? DBNull.Value;
+                }
                 heightParam.Value = (object?)f.HeightM ?? DBNull.Value;
                 if (heightSourceParam is not null)
                 {

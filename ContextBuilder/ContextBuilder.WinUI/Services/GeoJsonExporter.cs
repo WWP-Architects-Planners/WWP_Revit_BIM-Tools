@@ -60,9 +60,11 @@ public sealed class GeoJsonExporter
             }
 
             double? heightM = null;
+            double? baseHeightM = null;
             string? heightSource = null;
             if (layer.Layer == ContextLayer.Buildings && i < layer.BuildingFootprints.Count)
             {
+                baseHeightM = Math.Round(layer.BuildingFootprints[i].BaseHeightMeters, 3);
                 heightM = Math.Round(layer.BuildingFootprints[i].HeightMeters, 3);
                 heightSource = layer.BuildingFootprints[i].HeightSource;
             }
@@ -74,6 +76,7 @@ public sealed class GeoJsonExporter
                 {
                     layer = layer.Layer.ToString(),
                     geomType = "Polygon",
+                    base_height_m = baseHeightM,
                     height_m = heightM,
                     height_source = heightSource
                 },

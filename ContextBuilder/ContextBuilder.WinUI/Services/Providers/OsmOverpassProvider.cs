@@ -37,60 +37,134 @@ public sealed class OsmOverpassProvider
             return [];
         }
 
-        var query = BuildCombinedQuery(center, radiusMeters);
-        var json = await ExecuteOverpassAsync(query, cancellationToken).ConfigureAwait(false);
+        var query = BuildCombinedQuery(center, radiusMeters, targetLayers, includeRelations: true);
+        var fallbackQuery = BuildCombinedQuery(center, radiusMeters, targetLayers, includeRelations: false);
+        string? json = null;
+        Exception? lastException = null;
+
+        foreach (var endpoint in Endpoints)
+        {
+            try
+            {
+                json = await ExecuteOverpassAsync(endpoint, query, cancellationToken).ConfigureAwait(false);
+                break;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+            }
+
+            try
+            {
+                json = await ExecuteOverpassAsync(endpoint, fallbackQuery, cancellationToken).ConfigureAwait(false);
+                break;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+            }
+        }
+
+        if (json is null)
+        {
+            throw lastException ?? new HttpRequestException("Overpass request failed.");
+        }
+
         return ParseCombinedResults(targetLayers, json);
     }
 
-    private async Task<string> ExecuteOverpassAsync(string query, CancellationToken cancellationToken)
+    private async Task<string> ExecuteOverpassAsync(string endpoint, string query, CancellationToken cancellationToken)
     {
-        var delayMs = 800;
-        Exception? lastException = null;
+        using var response = await _httpClient.PostAsync(
+            endpoint,
+            new StringContent($"data={Uri.EscapeDataString(query)}", Encoding.UTF8, "application/x-www-form-urlencoded"),
+            cancellationToken).ConfigureAwait(false);
 
-        for (var attempt = 0; attempt < 6; attempt++)
+        if (response.StatusCode == HttpStatusCode.TooManyRequests ||
+            response.StatusCode == HttpStatusCode.ServiceUnavailable ||
+            response.StatusCode == HttpStatusCode.GatewayTimeout)
         {
-            var endpoint = Endpoints[attempt % Endpoints.Length];
-            using var response = await _httpClient.PostAsync(
-                endpoint,
-                new StringContent(query, Encoding.UTF8, "application/x-www-form-urlencoded"),
-                cancellationToken).ConfigureAwait(false);
-
-            if (response.IsSuccessStatusCode)
-            {
-                return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            if (response.StatusCode == HttpStatusCode.TooManyRequests || response.StatusCode == HttpStatusCode.ServiceUnavailable)
-            {
-                var retryAfter = response.Headers.RetryAfter?.Delta?.TotalMilliseconds;
-                var waitMs = retryAfter.HasValue && retryAfter.Value > 0
-                    ? (int)Math.Min(retryAfter.Value, 8000)
-                    : delayMs;
-                await Task.Delay(waitMs, cancellationToken).ConfigureAwait(false);
-                delayMs = Math.Min(delayMs * 2, 8000);
-                continue;
-            }
-
-            lastException = new HttpRequestException($"Overpass request failed ({(int)response.StatusCode} {response.ReasonPhrase})");
+            throw new HttpRequestException($"HTTP {(int)response.StatusCode}");
         }
 
-        throw lastException ?? new HttpRequestException("Overpass request failed after retries (likely rate-limited).");
+        if (!response.IsSuccessStatusCode)
+        {
+            var text = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var snippet = text.Length > 180 ? text[..180] : text;
+            throw new HttpRequestException($"HTTP {(int)response.StatusCode}: {snippet}");
+        }
+
+        return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private static string BuildCombinedQuery(GeoPoint center, double radiusMeters)
+    private static string BuildCombinedQuery(
+        GeoPoint center,
+        double radiusMeters,
+        IReadOnlyCollection<ContextLayer> layers,
+        bool includeRelations)
     {
-        var lat = center.Latitude.ToString("0.######", CultureInfo.InvariantCulture);
-        var lon = center.Longitude.ToString("0.######", CultureInfo.InvariantCulture);
-        var radius = Math.Max(50, radiusMeters).ToString("0", CultureInfo.InvariantCulture);
-        var body =
-            $"(" +
-            $"way(around:{radius},{lat},{lon})[building];relation(around:{radius},{lat},{lon})[building];" +
-            $"way(around:{radius},{lat},{lon})[highway];" +
-            $"way(around:{radius},{lat},{lon})[natural=water];relation(around:{radius},{lat},{lon})[natural=water];way(around:{radius},{lat},{lon})[waterway];way(around:{radius},{lat},{lon})[landuse=reservoir];" +
-            $"way(around:{radius},{lat},{lon})[leisure=park];relation(around:{radius},{lat},{lon})[leisure=park];way(around:{radius},{lat},{lon})[landuse=grass];way(around:{radius},{lat},{lon})[landuse=recreation_ground];" +
-            $"way(around:{radius},{lat},{lon})[boundary=parcel];way(around:{radius},{lat},{lon})[cadastre];" +
-            $");";
-        return $"data=[out:json][timeout:40];{body}out body geom;";
+        var halfSideMeters = Math.Max(50, radiusMeters);
+        var (south, west, north, east) = CalculateSquareBounds(center, halfSideMeters);
+        var southStr = south.ToString("0.######", CultureInfo.InvariantCulture);
+        var westStr = west.ToString("0.######", CultureInfo.InvariantCulture);
+        var northStr = north.ToString("0.######", CultureInfo.InvariantCulture);
+        var eastStr = east.ToString("0.######", CultureInfo.InvariantCulture);
+
+        var selectors = new List<string>();
+
+        if (layers.Contains(ContextLayer.Buildings))
+        {
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[building]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[\"building:part\"]");
+            if (includeRelations)
+            {
+                selectors.Add($"relation({southStr},{westStr},{northStr},{eastStr})[building]");
+                selectors.Add($"relation({southStr},{westStr},{northStr},{eastStr})[\"building:part\"]");
+            }
+        }
+
+        if (layers.Contains(ContextLayer.Roads))
+        {
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[highway]");
+        }
+
+        if (layers.Contains(ContextLayer.Water))
+        {
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[natural=water]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[waterway]");
+            if (includeRelations)
+            {
+                selectors.Add($"relation({southStr},{westStr},{northStr},{eastStr})[natural=water]");
+            }
+        }
+
+        if (layers.Contains(ContextLayer.Parks))
+        {
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[leisure=park]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[landuse=grass]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[landuse=recreation_ground]");
+            if (includeRelations)
+            {
+                selectors.Add($"relation({southStr},{westStr},{northStr},{eastStr})[leisure=park]");
+            }
+        }
+
+        if (layers.Contains(ContextLayer.Parcels))
+        {
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[boundary=parcel]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[boundary=lot]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[boundary=plot]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[cadastre]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[cadastral]");
+        }
+
+        if (selectors.Count == 0)
+        {
+            return "[out:json][timeout:40];();out body geom;";
+        }
+
+        var body = string.Join(';', selectors);
+        return $"[out:json][timeout:40];({body};);out body geom;";
     }
 
     private static List<LayerResult> ParseCombinedResults(IReadOnlyCollection<ContextLayer> selectedLayers, string json)
@@ -133,10 +207,11 @@ public sealed class OsmOverpassProvider
                 AddPolyOrLine(buildings, points, isClosed);
                 if (isClosed && points.Count >= 4)
                 {
-                    var (heightMeters, heightSource) = ParseBuildingHeight(tags);
+                    var (baseHeightMeters, heightMeters, heightSource) = ParseBuildingHeight(tags);
                     buildings.BuildingFootprints.Add(new BuildingFootprint
                     {
                         Ring = new List<GeoPoint>(points),
+                        BaseHeightMeters = baseHeightMeters,
                         HeightMeters = heightMeters,
                         HeightSource = heightSource
                     });
@@ -192,7 +267,7 @@ public sealed class OsmOverpassProvider
     }
 
     private static bool IsRoad(JsonElement tags) => HasTag(tags, "highway");
-    private static bool IsBuilding(JsonElement tags) => HasTag(tags, "building");
+    private static bool IsBuilding(JsonElement tags) => HasTag(tags, "building") || HasTag(tags, "building:part");
     private static bool IsWater(JsonElement tags) =>
         TagEquals(tags, "natural", "water") ||
         HasTag(tags, "waterway") ||
@@ -201,26 +276,53 @@ public sealed class OsmOverpassProvider
         TagEquals(tags, "leisure", "park") ||
         TagEquals(tags, "landuse", "grass") ||
         TagEquals(tags, "landuse", "recreation_ground");
-    private static bool IsParcel(JsonElement tags) =>
-        TagEquals(tags, "boundary", "parcel") ||
-        HasTag(tags, "cadastre");
-
-    private static (double HeightMeters, string Source) ParseBuildingHeight(JsonElement tags)
+    private static bool IsParcel(JsonElement tags)
     {
-        var fromHeight = ParseLengthMeters(GetTagString(tags, "height"));
-        if (fromHeight > 0)
+        var boundary = (GetTagString(tags, "boundary") ?? string.Empty).ToLowerInvariant();
+        var landuse = (GetTagString(tags, "landuse") ?? string.Empty).ToLowerInvariant();
+
+        if (boundary is "parcel" or "lot" or "plot" or "cadastral")
         {
-            return (fromHeight, "osm_height");
+            return true;
         }
 
-        var levelsText = GetTagString(tags, "building:levels");
-        if (double.TryParse(levelsText, NumberStyles.Float, CultureInfo.InvariantCulture, out var levels) ||
-            double.TryParse(levelsText, out levels))
+        if (HasTag(tags, "cadastre") || HasTag(tags, "cadastral"))
         {
-            return (Math.Clamp(levels * 3.2, 3.0, 180.0), "osm_levels");
+            return true;
         }
 
-        return (0, "unknown");
+        return landuse is "residential" or "commercial" or "industrial" or "retail" or "allotments" or "garages";
+    }
+
+    private static (double BaseHeightMeters, double HeightMeters, string Source) ParseBuildingHeight(JsonElement tags)
+    {
+        var baseZ = ParseLengthMeters(GetTagString(tags, "min_height"));
+        var minLevels = ParseLengthMeters(GetTagString(tags, "min_level"));
+        if (baseZ <= 0 && minLevels > 0)
+        {
+            baseZ = minLevels * 3.2;
+        }
+
+        var topZ = ParseLengthMeters(GetTagString(tags, "height"));
+        var levels = ParseLengthMeters(GetTagString(tags, "building:levels"));
+        if (topZ <= 0 && levels > 0)
+        {
+            topZ = levels * 3.2;
+        }
+
+        var source = "unknown";
+        if (topZ > 0)
+        {
+            source = GetTagString(tags, "height") is not null ? "osm_height" : "osm_levels";
+        }
+
+        if (topZ <= baseZ + 0.1)
+        {
+            topZ = baseZ + 3.0;
+        }
+
+        var height = topZ > 0 ? Math.Clamp(topZ - baseZ, 3.0, 320.0) : 0;
+        return (Math.Max(0, baseZ), height, source);
     }
 
     private static string? GetTagString(JsonElement tags, string key)
@@ -311,5 +413,22 @@ public sealed class OsmOverpassProvider
         {
             points.Add(points[0]);
         }
+    }
+
+    private static (double South, double West, double North, double East) CalculateSquareBounds(GeoPoint center, double halfSideMeters)
+    {
+        var latRad = center.Latitude * Math.PI / 180.0;
+        var metersPerDegreeLat = 111_320d;
+        var metersPerDegreeLon = Math.Max(1e-9, metersPerDegreeLat * Math.Cos(latRad));
+
+        var dLat = halfSideMeters / metersPerDegreeLat;
+        var dLon = halfSideMeters / metersPerDegreeLon;
+
+        return (
+            center.Latitude - dLat,
+            center.Longitude - dLon,
+            center.Latitude + dLat,
+            center.Longitude + dLon
+        );
     }
 }

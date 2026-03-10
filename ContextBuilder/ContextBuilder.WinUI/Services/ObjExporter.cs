@@ -119,7 +119,7 @@ public sealed class ObjExporter
         sb.AppendLine("g buildings");
         var footprints = buildingLayer.BuildingFootprints.Count > 0
             ? buildingLayer.BuildingFootprints
-            : buildingLayer.Polygons.Select(p => new BuildingFootprint { Ring = p, HeightMeters = 0, HeightSource = "heuristic" }).ToList();
+            : buildingLayer.Polygons.Select(p => new BuildingFootprint { Ring = p, BaseHeightMeters = 0, HeightMeters = 0, HeightSource = "heuristic" }).ToList();
 
         foreach (var footprint in footprints)
         {
@@ -130,9 +130,11 @@ public sealed class ObjExporter
                 continue;
             }
 
+            var baseHeight = Math.Max(0, footprint.BaseHeightMeters);
             var height = footprint.HeightMeters > 0
                 ? Math.Clamp(footprint.HeightMeters, 3, 320)
                 : InferBuildingHeightFromArea(ring);
+            var topHeight = baseHeight + height;
 
             var bottom = new List<int>(ring.Count);
             var top = new List<int>(ring.Count);
@@ -140,14 +142,14 @@ public sealed class ObjExporter
             foreach (var p in ring)
             {
                 bottom.Add(vertexIndex);
-                sb.AppendLine(Vertex(p.X, p.Y, 0));
+                sb.AppendLine(Vertex(p.X, p.Y, baseHeight));
                 vertexIndex++;
             }
 
             foreach (var p in ring)
             {
                 top.Add(vertexIndex);
-                sb.AppendLine(Vertex(p.X, p.Y, height));
+                sb.AppendLine(Vertex(p.X, p.Y, topHeight));
                 vertexIndex++;
             }
 

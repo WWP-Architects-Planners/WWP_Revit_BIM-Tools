@@ -116,55 +116,58 @@ public sealed class OsmClient
 
     private static string BuildOverpassQuery(GeoPoint center, double radiusMeters, IReadOnlyCollection<string> layers, bool includeRelations)
     {
-        var radius = Math.Max(50, radiusMeters);
-        var lat = center.Latitude.ToString("0.######", CultureInfo.InvariantCulture);
-        var lon = center.Longitude.ToString("0.######", CultureInfo.InvariantCulture);
+        var halfSideMeters = Math.Max(50, radiusMeters);
+        var (south, west, north, east) = CalculateSquareBounds(center, halfSideMeters);
+        var southStr = south.ToString("0.######", CultureInfo.InvariantCulture);
+        var westStr = west.ToString("0.######", CultureInfo.InvariantCulture);
+        var northStr = north.ToString("0.######", CultureInfo.InvariantCulture);
+        var eastStr = east.ToString("0.######", CultureInfo.InvariantCulture);
 
         var selectors = new List<string>();
 
         if (layers.Contains("buildings"))
         {
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[building]");
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[\"building:part\"]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[building]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[\"building:part\"]");
             if (includeRelations)
             {
-                selectors.Add($"relation(around:{radius:0},{lat},{lon})[building]");
-                selectors.Add($"relation(around:{radius:0},{lat},{lon})[\"building:part\"]");
+                selectors.Add($"relation({southStr},{westStr},{northStr},{eastStr})[building]");
+                selectors.Add($"relation({southStr},{westStr},{northStr},{eastStr})[\"building:part\"]");
             }
         }
 
         if (layers.Contains("roads"))
         {
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[highway]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[highway]");
         }
 
         if (layers.Contains("water"))
         {
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[natural=water]");
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[waterway]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[natural=water]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[waterway]");
             if (includeRelations)
             {
-                selectors.Add($"relation(around:{radius:0},{lat},{lon})[natural=water]");
+                selectors.Add($"relation({southStr},{westStr},{northStr},{eastStr})[natural=water]");
             }
         }
 
         if (layers.Contains("parks"))
         {
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[leisure=park]");
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[landuse=grass]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[leisure=park]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[landuse=grass]");
             if (includeRelations)
             {
-                selectors.Add($"relation(around:{radius:0},{lat},{lon})[leisure=park]");
+                selectors.Add($"relation({southStr},{westStr},{northStr},{eastStr})[leisure=park]");
             }
         }
 
         if (layers.Contains("parcels"))
         {
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[boundary=parcel]");
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[boundary=lot]");
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[boundary=plot]");
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[cadastre]");
-            selectors.Add($"way(around:{radius:0},{lat},{lon})[cadastral]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[boundary=parcel]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[boundary=lot]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[boundary=plot]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[cadastre]");
+            selectors.Add($"way({southStr},{westStr},{northStr},{eastStr})[cadastral]");
         }
 
         if (selectors.Count == 0)
@@ -174,6 +177,23 @@ public sealed class OsmClient
 
         var body = string.Join(';', selectors);
         return $"[out:json][timeout:40];({body};);out body geom;";
+    }
+
+    private static (double South, double West, double North, double East) CalculateSquareBounds(GeoPoint center, double halfSideMeters)
+    {
+        var latRad = center.Latitude * Math.PI / 180.0;
+        var metersPerDegreeLat = 111_320d;
+        var metersPerDegreeLon = Math.Max(1e-9, metersPerDegreeLat * Math.Cos(latRad));
+
+        var dLat = halfSideMeters / metersPerDegreeLat;
+        var dLon = halfSideMeters / metersPerDegreeLon;
+
+        return (
+            center.Latitude - dLat,
+            center.Longitude - dLon,
+            center.Latitude + dLat,
+            center.Longitude + dLon
+        );
     }
 
     private static List<OsmElement> ParseElements(string json)
